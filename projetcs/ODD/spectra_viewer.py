@@ -2,7 +2,7 @@
 # Add main directory to enable imports  
 if __name__ == '__main__' :
 	import os
-	os.sys.path.append(os.path.abspath('..'))
+	os.sys.path.append(os.path.abspath('../..'))
 	
 	
 from libs.gui.iterate_file import IterateFile 

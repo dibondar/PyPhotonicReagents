@@ -194,6 +194,18 @@ class ODD_Tab (HardwareGUIControl) :
 		spectrum_options_ctrl.__label__ = "spectrum_postprocess"
 		sizer.Add (spectrum_options_ctrl,  flag=wx.EXPAND, border=5)	
 		
+		# Fitness function options
+		sizer.Add ( wx.StaticText(self, label="Fitness function") )
+		self.fitness_options = {
+			"determinant"		:	lambda F : np.abs(np.linalg.det(F)),
+			"min eigenvalue" 	:	lambda F : np.abs(np.linalg.eigvals(F)).min(),
+			"max eigenvalue"	:	lambda F : np.abs(np.linalg.eigvals(F)).max()
+		}
+		choices = self.fitness_options.keys()
+		fitness_options_ctrl = wx.ComboBox (self, choices=choices, value=choices[1], style=wx.CB_READONLY )
+		fitness_options_ctrl.__label__ = "fitness_options"
+		sizer.Add (fitness_options_ctrl,  flag=wx.EXPAND, border=5)
+		
 		# Separator
 		#sizer.Add (wx.StaticText(self), border=5)
 		
@@ -394,6 +406,7 @@ class ODD_Tab (HardwareGUIControl) :
 		self.reference_signal 		= { }
 		self.log_reference_signal	= { }
 		self.emission_spectra 		= { }
+		self.N_emission_spectra		= { }
 		
 	def StartOptimization (self, event, DoGA) :
 		"""
@@ -486,7 +499,10 @@ class ODD_Tab (HardwareGUIControl) :
 			tools.initRepeat, creator.Individual, self.optimization_toolbox.attr_float, self.num_params)
 		
 		# Define the function converting GA ind into the pulse shaper
-		self.Ind2PulseShape = self.ind2pulse_shape[ga_settings["pulse_shaping_option"]]
+		self.Ind2PulseShape = self.ind2pulse_shape[ ga_settings["pulse_shaping_option"] ]
+		
+		# Define fitness function
+		self.FitnessFunction = self.fitness_options[ ga_settings["fitness_options"] ] 
 		
 		# Set post-processing spectrum function 
 		self.SpectrumPostProcess = _SpectrumPostProcess.Select( ga_settings["spectrum_postprocess"] )
@@ -547,11 +563,15 @@ class ODD_Tab (HardwareGUIControl) :
 		
 		# This is to obtain a super long time averaged 
 		# emission spectra of molecules in each channel
+		
+		# The mean is calculated iteratively 
+		# see, e.g., http://www.heikohoffmann.de/htmlthesis/node134.html
 		try :
-			self.emission_spectra[channel] += spectrum
-			self.emission_spectra[channel] /= 2
+			self.N_emission_spectra[channel] += 1
+			self.emission_spectra[channel] += ( spectrum - self.emission_spectra[channel] )/ self.N_emission_spectra[channel]
 		except KeyError :
-			self.emission_spectra[channel] = spectrum
+			self.emission_spectra[channel] = spectrum.astype(np.float)
+			self.N_emission_spectra[channel] = 1
 		
 		return self.SpectrumPostProcess(spectrum)
 	
@@ -567,6 +587,7 @@ class ODD_Tab (HardwareGUIControl) :
 		# Consistency check
 		assert len(self.channels) == 1, "Only one channel must be specified" 
 		channel = self.channels[0]
+		
 		# Move to a selected channel 
 		self.DevSampleSwitcher.MoveToChannel(channel)
 			
@@ -593,7 +614,7 @@ class ODD_Tab (HardwareGUIControl) :
 				ind.fitness.values = (-ind.spectra[channel].sum(),)
 				
 			self.optimization_pop[:] = self.optimization_toolbox.select( 
-				self.optimization_pop + offspring, int(1.5*self.population_size)
+				self.optimization_pop + offspring, int(1.2*self.population_size)
 				)
 		
 		wx.Yield()
@@ -637,7 +658,7 @@ class ODD_Tab (HardwareGUIControl) :
 			offspring = self.MeasureSpectra(offspring)
 			# Selection
 			self.optimization_pop[:] = self.optimization_toolbox.select(
-				self.CalculateFitness(self.optimization_pop + offspring), int(1.5*self.population_size)
+				self.CalculateFitness(self.optimization_pop + offspring), int(1.2*self.population_size)
 			)
 		
 		wx.Yield()
@@ -710,7 +731,7 @@ class ODD_Tab (HardwareGUIControl) :
 			fluorescence_matrix = ( np.array(F).reshape((N,N)) for F in fluorescence_matrix )
 			
 			# calculate the rank (i.e., fitness) of the pulse tuple 
-			rank = max( abs(np.linalg.det(F)) for F in fluorescence_matrix )
+			rank = max( self.FitnessFunction(F) for F in fluorescence_matrix )
 		
 			pulse_tuple_ranks.append( ( rank, ind_tuple) )
 			
@@ -897,16 +918,12 @@ class ODD_Tab (HardwareGUIControl) :
 
 		# Open the file for optimization log
 		with  h5py.File (self.optimization_log_filename, 'a') as optimization_log_file :
+			#################### Saving current optimization iteration ####################
 			checkpoint = optimization_log_file["optimization_iterations"]
 			checkpoint = checkpoint.create_group( str(self.current_iteration_number) )
 	
 			# Saving the population  
 			checkpoint["pickled_population"] = np.string_( pickle.dumps(self.optimization_pop) )
-			
-			# Save reference fluorescence
-			ref_signal_signal_grp = checkpoint.create_group("reference_signal")
-			for channel, ref_signal in self.reference_signal.items() :
-				ref_signal_signal_grp[ str(channel) ] = ref_signal
 				
 			# Saving population in HDF5 format in the appropriate HDF5 group 
 			individuals = checkpoint.create_group("individuals")
@@ -919,7 +936,34 @@ class ODD_Tab (HardwareGUIControl) :
 				spectra_grp = ind_grp.create_group("spectra")
 				for channel, spectrum in ind.spectra.iteritems() :
 					spectra_grp[ str(channel) ] = spectrum
-		
+			
+			#################### Saving log information ####################
+			# Delete existing summary group
+			try : del optimization_log_file["optimization_summary"] 
+			except KeyError : pass
+			
+			# Create new group
+			summary_group = optimization_log_file.create_group("optimization_summary")
+			for key, val in self.optimization_log.iteritems() :
+				summary_group[key] = val
+			
+			# Save the reference signal summary 
+			try : del optimization_log_file["reference_signal_summary"] 
+			except KeyError : pass
+			
+			summary_group = optimization_log_file.create_group("reference_signal_summary")
+			for key, val in self.log_reference_signal.iteritems() :
+				summary_group[ "channel_%d" % key ] = val
+				
+			# Save super long time averages of emission spectra  
+			try : del optimization_log_file["emission_spectra"] 
+			except KeyError : pass
+			
+			emission_spectra_grp = optimization_log_file.create_group("emission_spectra")
+			for key, val in self.emission_spectra.iteritems() :
+				emission_spectra_grp[ "channel_%d" % key ] = val
+			##########################################################################
+				
 		# Going to next iteration
 		self.current_iteration_number += 1
 	
@@ -964,35 +1008,7 @@ class ODD_Tab (HardwareGUIControl) :
 		Stop GA
 		"""
 		self.need_abort = True 
-		
-		# Saving log information
-		with  h5py.File (self.optimization_log_filename, 'a') as optimization_log_file :
 			
-			# Delete existing summary group
-			try : del optimization_log_file["optimization_summary"] 
-			except KeyError : pass
-			
-			# Create new group
-			summary_group = optimization_log_file.create_group("optimization_summary")
-			for key, val in self.optimization_log.iteritems() :
-				summary_group[key] = val
-			
-			# Save the reference signal summary 
-			try : del optimization_log_file["reference_signal_summary"] 
-			except KeyError : pass
-			
-			summary_group = optimization_log_file.create_group("reference_signal_summary")
-			for key, val in self.log_reference_signal.iteritems() :
-				summary_group[ "channel_%d" % key ] = val
-				
-			# Save super long time averages of emission spectra  
-			try : del optimization_log_file["emission_spectra"] 
-			except KeyError : pass
-			
-			emission_spectra_grp = optimization_log_file.create_group("emission_spectra")
-			for key, val in self.emission_spectra.iteritems() :
-				emission_spectra_grp[ "channel_%d" % key ] = val
-					
 		# Adjusting button's settings
 		button = event.GetEventObject()
 		button.SetLabel (button._start_label)

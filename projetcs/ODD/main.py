@@ -6,12 +6,10 @@
 # Add main directory to enable imports  
 if __name__ == '__main__' :
 	import os
-	os.sys.path.append(os.path.abspath('..'))
+	os.sys.path.append(os.path.abspath('../..'))
 ########################################################################
 
 import wx
-from wx.lib.agw.floatspin import FloatSpin as wxFloatSpin
-
 
 import numpy as np
 import random

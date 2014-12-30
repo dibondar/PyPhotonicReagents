@@ -27,6 +27,9 @@ class IterateFile (wx.Frame) :
 	To use this abstract class the method <self.UpdateFrame(event=None)> must be defined.
 	This method is called when the current frame is changed. 
 	
+	The optional method <self.IniLoad (hdf5_file)> will be called after the HDF5 file was 
+	successfully opened to load desired data.
+	
 	The first step in <self.UpdateFrame> should be a call to <self.GetCurrentFrame>
 	"""
 	def __init__ (self, groupename, parent=None, filename = None, title=None) :
@@ -48,6 +51,10 @@ class IterateFile (wx.Frame) :
 		
 		# Open the HDF5 file
 		self.data_file = h5py.File (filename, 'r')
+		
+		# Loading other data, if desired
+		try : self.IniLoad (self.data_file)
+		except AttributeError : pass
 		
 		# Saving the group over which the iteration happens  
 		self.iteration_group = self.data_file[groupename]
@@ -99,9 +106,9 @@ class IterateFile (wx.Frame) :
 
 		# Animation button
 		self.animation_button = wx.Button (panel)
-		self.animation_button.__start_label__ = "Start animation"
-		self.animation_button.__stop_label__ = "STOP animation"
-		self.animation_button.SetLabel (self.animation_button.__start_label__)
+		self.animation_button.__start_label = "Start animation"
+		self.animation_button.__stop_label = "STOP animation"
+		self.animation_button.SetLabel (self.animation_button.__start_label)
 		self.Bind (wx.EVT_BUTTON, self.OnAnimation, self.animation_button)
 		boxsizer.Add(self.animation_button, flag=wx.LEFT, border=5)
 
@@ -151,30 +158,27 @@ class IterateFile (wx.Frame) :
 		"""
 		<self.animation_button> was clicked
 		"""
-		if self.animation_button.GetLabel() == self.animation_button.__start_label__ :
-			# Initiate animation
+		if self.animation_button.GetLabel() == self.animation_button.__start_label :
 			
-			# set the timer
-			timer_id = wx.NewId()
-			self.animation_timer = wx.Timer (self, timer_id)
-			self.animation_timer.Start (0, True)
-			
-			def do_animation (event) :
+			def DoAnimation () :
+				wx.Yield()
 				current_value = self.current_frame.GetValue()
 				if current_value < len(self.frames)-1 : 
 					# Continue animation
-					self.current_frame.SetValue(current_value+1); wx.CallAfter(self.UpdateFrame)
-					# Setting next timer call 
-					self.animation_timer.Start (0, True)
+					self.current_frame.SetValue(current_value+1)
+					self.UpdateFrame()
+					
+					# Decide whether to continue animation
+					if self.animation_button.GetLabel() == self.animation_button.__stop_label :
+						wx.CallAfter(DoAnimation)
 				else :
 					# Stop animation
 					self.OnAnimation()
-				
-			wx.EVT_TIMER (self, timer_id, do_animation)
-			self.animation_button.SetLabel( self.animation_button.__stop_label__ )
+			
+			# Initiate animation
+			wx.CallAfter(DoAnimation)
+			self.animation_button.SetLabel( self.animation_button.__stop_label )
 		else :
 			# Stop animation
-			self.animation_timer.Stop()
-			del self.animation_timer
-			self.animation_button.SetLabel( self.animation_button.__start_label__ ) 
+			self.animation_button.SetLabel( self.animation_button.__start_label ) 
 		
