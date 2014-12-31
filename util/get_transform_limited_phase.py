@@ -19,10 +19,10 @@ from libs.gui.basic_window import BasicWindow
 from libs.gui.deap_algorthims_tabs import GATab, PixelWiseGA
 
 # Hardware
-#from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
-#from libs.dev.spectrometer_ocean_optics import OceanOpticsSpectrometerTab as SpectrometerTab
-from libs.dev.camera_istar import ManagerIStarCamera as ManagerSpectrometer
-from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
+from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
+from libs.dev.spectrometer_ocean_optics import OceanOpticsSpectrometerTab as SpectrometerTab
+#from libs.dev.camera_istar import ManagerIStarCamera as ManagerSpectrometer
+#from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
 
 from libs.dev.pulse_shaper import ManagerShaper, PulseShaperTab, PULSESHAPER_MAX_VAL, ShaperInt
 

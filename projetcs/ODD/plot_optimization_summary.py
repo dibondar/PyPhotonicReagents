@@ -27,12 +27,12 @@ with h5py.File (filename, 'r') as F :
 	# Load summary data
 	optimization_summary = {}
 	for key, value in F["optimization_summary"].iteritems() :
-		optimization_summary[ key ] = value[...][:35]
+		optimization_summary[ key ] = value[...]#[:35]
 		
 	# Load reference signal info
 	reference_signal = {}
 	for key, value in F["reference_signal_summary"].iteritems() :
-		reference_signal[ key ] = value[...][:35]
+		reference_signal[ key ] = value[...]#[:35]
 		
 ############################## Plot data ##############################
 
@@ -62,7 +62,7 @@ plt.subplot(223)
 obj = optimization_summary["avg"].astype(np.float)
 
 for ref in reference_signal.itervalues() :
-	R = obj / ref[:obj.size]
+	R = obj / ref[:obj.size].astype(np.float)
 	R /= R.max()
 	plt.plot( R )
 

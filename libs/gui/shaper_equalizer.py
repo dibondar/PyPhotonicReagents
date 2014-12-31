@@ -20,6 +20,12 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 		if self.NumPixels == RETURN_FAIL :
 			raise RuntimeError ("Pulse shaper equalizer cannot be started since calibration file was not loaded")
 		
+		# Limit number of pixels `pixel_number_bound`
+		pixel_number_bound = 70
+		if self.NumPixels > pixel_number_bound :
+			print "Pulse Shaper Equalizer: Original number of pixels %d was restricted to %d" % (self.NumPixels, pixel_number_bound)
+			self.NumPixels = pixel_number_bound
+			
 		dw, dh = wx.DisplaySize()
 		wx.Frame.__init__ (self, parent, title="Pulse shaper Equalizer", size=(0.8*dw, 0.8*dh) )
 		

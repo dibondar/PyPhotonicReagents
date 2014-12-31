@@ -17,7 +17,7 @@ class SpectralScanViewer (IterateFile) :
 	def IniLoad(self, data_file) :
 	
 		# Find out what kind of pulse shapes are saved in the file
-		pulse_shaping_option = data_file["settings/ODD_GA/pulse_shaping_option"][...]
+		pulse_shaping_option = str( data_file["settings/ODD_GA/pulse_shaping_option"][...] )
 		self.plot_ampl_phase =  ( pulse_shaping_option == "amplitude and phase")
 		
 		if not self.plot_ampl_phase :

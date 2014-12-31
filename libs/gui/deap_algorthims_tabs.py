@@ -34,65 +34,35 @@ class GATab (HardwareGUIControl) :
 		
 		self.sizer = wx.BoxSizer(wx.VERTICAL)
 		
-		# Separator
-		self.sizer.Add (wx.StaticText(self), border=5)
-		
-		# Population size
-		self.sizer.Add (wx.StaticText(self, label="Population size"), flag=wx.LEFT, border=5)
-		population_size_ctrl  = wx.SpinCtrl (self, value="10", min=1, max=100000)
-		population_size_ctrl.__label__ = "population_size"
-		self.sizer.Add (population_size_ctrl , flag=wx.EXPAND, border=5)
-		
-		# size of HallOfFame
-		self.sizer.Add (wx.StaticText(self, label="Hall of fame size"), flag=wx.LEFT, border=5)
-		halloffame_size_ctrl  = wx.SpinCtrl (self, value="2", min=1, max=100000)
-		halloffame_size_ctrl.__label__ = "halloffame_size"
-		self.sizer.Add (halloffame_size_ctrl , flag=wx.EXPAND, border=5)
-		
-		# Selection size
-		self.sizer.Add (wx.StaticText(self, label="Selection size"), flag=wx.LEFT, border=5)
-		selection_size_ctrl = wx.SpinCtrl (self, value="2", min=1, max=100)
-		selection_size_ctrl.__label__ = "selection_size"
-		self.sizer.Add (selection_size_ctrl, flag=wx.EXPAND, border=5)
-		
-		# Separator
-		self.sizer.Add (wx.StaticText(self), border=5)
-			
-		########################################################################
-		# Setting characterizing mutation
-		########################################################################
-	
-		self.sizer.Add (wx.StaticText(self, label="Gaussian mutation:"), flag=wx.LEFT, border=5)
-		
-		self.sizer.Add (wx.StaticText(self, label="\nMean"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="Gaussian mutation:\nMean"), flag=wx.LEFT, border=5)
 		mu_ctrl = wxFloatSpin (self, min_val=0, max_val=1, increment=0.01, value=0.0, digits=3)
 		mu_ctrl.__label__ = "gaussian_mutation_mu"
-		self.sizer.Add (mu_ctrl , flag=wx.EXPAND, border=5)
+		sizer.Add (mu_ctrl , flag=wx.EXPAND, border=5)
 		
-		self.sizer.Add (wx.StaticText(self, label="Sigma"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="Sigma"), flag=wx.LEFT, border=5)
 		sigma_ctrl = wxFloatSpin (self, min_val=0, max_val=1, increment=0.01, value=0.05, digits=3)
 		sigma_ctrl.__label__ = "gaussian_mutation_sigma"
-		self.sizer.Add (sigma_ctrl , flag=wx.EXPAND, border=5)
+		sizer.Add (sigma_ctrl , flag=wx.EXPAND, border=5)
 	
-		self.sizer.Add (wx.StaticText(self, label="Independent  probability for attribute mutation"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="Independent  probability for attribute mutation"), flag=wx.LEFT, border=5)
 		indpb_ctrl = wxFloatSpin (self, min_val=0, max_val=1, increment=0.01, value=1., digits=3)
 		indpb_ctrl.__label__ = "mutation_indpb"
-		self.sizer.Add (indpb_ctrl, flag=wx.EXPAND, border=5)	
+		sizer.Add (indpb_ctrl, flag=wx.EXPAND, border=5)	
 			
 		# Separator
-		self.sizer.Add (wx.StaticText(self), border=5)
+		sizer.Add (wx.StaticText(self), border=5)
 
 		# cxpb - The probability of mating two individuals 
-		self.sizer.Add (wx.StaticText(self, label="Mating probability"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="Mating probability"), flag=wx.LEFT, border=5)
 		cxpb_ctrl = wxFloatSpin (self, min_val=0, max_val=1, increment=0.01, value=0.5, digits=3)
 		cxpb_ctrl.__label__ = "cxpb"
-		self.sizer.Add (cxpb_ctrl, flag=wx.EXPAND, border=5)
+		sizer.Add (cxpb_ctrl, flag=wx.EXPAND, border=5)
 		
 		# mutpb - The probability of mutating an individuals
-		self.sizer.Add (wx.StaticText(self, label="Mutating probability"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="Mutating probability"), flag=wx.LEFT, border=5)
 		mutpb_ctrl = wxFloatSpin (self, min_val=0, max_val=1, increment=0.01, value=0.1, digits=3)
 		mutpb_ctrl.__label__ = "mutpb"
-		self.sizer.Add (mutpb_ctrl, flag=wx.EXPAND, border=5)
+		sizer.Add (mutpb_ctrl, flag=wx.EXPAND, border=5)
 		
 		self.SetSizer(self.sizer)
 		
@@ -161,10 +131,10 @@ class PixelWiseGA :
 		self.optimization_toolbox = base.Toolbox()
 			
 		# Attribute generator
-		self.optimization_toolbox.register("attr_float", 
-						lambda mu, sigma : random.gauss(mu,sigma) % (max_val - min_val) + min_val, 
+		self.optimization_toolbox.register("attr_float", random.rand)
+						#lambda mu, sigma : random.gauss(mu,sigma) % (max_val - min_val) + min_val, 
 						# lambda mu, sigma : min(max(random.gauss(mu,sigma),min_val), max_val), 
-						ga_settings["gaussian_mutation_mu"], ga_settings["gaussian_mutation_sigma"] )
+						#ga_settings["gaussian_mutation_mu"], ga_settings["gaussian_mutation_sigma"] )
 		
 		# Structure initializers
 		self.optimization_toolbox.register("individual", 

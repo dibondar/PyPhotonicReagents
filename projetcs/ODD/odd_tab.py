@@ -485,9 +485,9 @@ class ODD_Tab (HardwareGUIControl) :
 		self.optimization_toolbox = base.Toolbox()
 			
 		# Attribute generator
-		self.optimization_toolbox.register("attr_float", random.random)
-						#lambda mu, sigma : random.gauss(mu,sigma) % (max_val - min_val) + min_val , 
-						#ga_settings["gaussian_mutation_mu"], ga_settings["gaussian_mutation_sigma"] )
+		self.optimization_toolbox.register("attr_float", #random.random)
+						lambda mu, sigma : random.gauss(mu,sigma) % (max_val - min_val) + min_val , 
+						ga_settings["gaussian_mutation_mu"], ga_settings["gaussian_mutation_sigma"] )
 						#0.5*(max_val + min_val), ga_settings["gaussian_mutation_sigma"] )
 		
 		# Save the number of optimization variable
@@ -545,6 +545,7 @@ class ODD_Tab (HardwareGUIControl) :
 		# Adjusting button's settings
 		button = event.GetEventObject()
 		button.SetLabel (button._stop_label)
+		button.SetBackgroundColour('red')
 		button.Bind( wx.EVT_BUTTON, self.StopOptimization)
 		
 		# Start doing a single iteration GA
@@ -556,12 +557,8 @@ class ODD_Tab (HardwareGUIControl) :
 		"""
 		# Get spectra
 		spectrum = self.DevSpectrometer.AcquiredData().astype(np.int)
-				
-		# Subtract the background
-		spectrum  -= self.background_signal[channel]
-		#spectrum[ np.nonzero(spectrum < 0) ] = 0
 		
-		# This is to obtain a super long time averaged 
+		# The following block is to obtain a super long time averaged 
 		# emission spectra of molecules in each channel
 		
 		# The mean is calculated iteratively 
@@ -572,6 +569,9 @@ class ODD_Tab (HardwareGUIControl) :
 		except KeyError :
 			self.emission_spectra[channel] = spectrum.astype(np.float)
 			self.N_emission_spectra[channel] = 1
+			
+		# Subtract the background
+		spectrum  -= self.background_signal[channel]
 		
 		return self.SpectrumPostProcess(spectrum)
 	
@@ -595,6 +595,10 @@ class ODD_Tab (HardwareGUIControl) :
 			# Record spectrum
 			self.optimization_pop = self.MeasureSpectra(self.optimization_pop)
 			
+			wx.Yield()
+			# abort, if requested 
+			if self.need_abort : return
+			
 			# Calculate the fitness the population
 			for ind in self.optimization_pop :
 				ind.fitness.values = (-ind.spectra[channel].sum(),)
@@ -609,6 +613,10 @@ class ODD_Tab (HardwareGUIControl) :
 			# Measure spectra for offspring only
 			offspring = self.MeasureSpectra(offspring)
 			
+			wx.Yield()
+			# abort, if requested 
+			if self.need_abort : return
+			
 			# Calculate the fitness  of offspring
 			for ind in offspring :
 				ind.fitness.values = (-ind.spectra[channel].sum(),)
@@ -616,7 +624,7 @@ class ODD_Tab (HardwareGUIControl) :
 			self.optimization_pop[:] = self.optimization_toolbox.select( 
 				self.optimization_pop + offspring, int(1.2*self.population_size)
 				)
-		
+				
 		wx.Yield()
 		# abort, if requested 
 		if self.need_abort : return
@@ -1012,6 +1020,7 @@ class ODD_Tab (HardwareGUIControl) :
 		# Adjusting button's settings
 		button = event.GetEventObject()
 		button.SetLabel (button._start_label)
+		button.SetBackgroundColour('')
 		button.Bind( wx.EVT_BUTTON, button._start_method)
 		
 	def MeasureConcentration (self, event) :

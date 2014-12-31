@@ -3,7 +3,7 @@ import wx
 import h5py
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-from itertools import product, combinations_with_replacement
+from itertools import combinations_with_replacement
 from scipy.stats import norm, normaltest
 
 try : filename
@@ -41,8 +41,8 @@ partitions = []
 
 while not len(partitions) :
 	partitions = [
-		c	for c in combinations_with_replacement(points, 2 ) 
-			if np.prod(c) >= len(reference_signal)
+		_ for _ in combinations_with_replacement(points, 2 ) 
+		if np.prod(_) >= len(reference_signal)
 	]
 	points.extend( [ min(points) - 1, max(points) + 1] )
 	
@@ -60,11 +60,17 @@ plt.show()
 
 ############################## Plot correlations ##############################
 
-for ref1, ref2 in product( reference_signal.itervalues(), reference_signal.itervalues() ) :
-	plt.plot( np.correlate(ref1, ref2, mode='full')[-len(ref1):] )
+def Cov (x,y) :
+	x = x - x.mean()
+	y = y - y.mean()
+	cov = np.correlate(x, y, mode='same')
+	return cov[len(cov)/2:]
+
+for ref1, ref2 in combinations_with_replacement( reference_signal.itervalues(), 2 ) :
+	plt.plot( Cov(ref1, ref2) )
 	
 plt.legend( [ 
-	"%s %s" % ref for ref in product( reference_signal.keys(), reference_signal.keys() ) 
+	"%s %s" % ref for ref in combinations_with_replacement( reference_signal.keys(), 2 ) 
 ] )
 
 plt.show()

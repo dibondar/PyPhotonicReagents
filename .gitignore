@@ -52,3 +52,10 @@ docs/_build/
 
 # PyBuilder
 target/
+*.hdf5
+projetcs/ODD/plot_optimization_summary_OLD_FILE.py
+projetcs/ODD/test.py
+util/get_transform_limited_phase_nidaqmx - Copy.py
+util/get_transform_limited_phase_nidaqmx.py
+util/get_transform_limited_phase_nidaqmx_polynom.py
+util/test.py

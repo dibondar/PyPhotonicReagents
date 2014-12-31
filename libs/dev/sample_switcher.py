@@ -229,8 +229,13 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		sb_sizer.Add (wx.StaticText(self), flag=wx.LEFT, border=5)
 		
 		# Calibrate button
-		calibrate_button = wx.Button (self, label="Scan and calibrate")
-		calibrate_button.Bind (wx.EVT_BUTTON, self.CalibrateSampleSwitcher)
+		calibrate_button = wx.Button (self)
+		calibrate_button._start_label ="Scan and calibrate"
+		calibrate_button._stop_label ="STOP calibration"
+		calibrate_button.SetLabel (calibrate_button._start_label)
+		calibrate_button._start_method = self.CalibrateSampleSwitcher
+		calibrate_button._stop_method = self.StopCalibration
+		calibrate_button.Bind (wx.EVT_BUTTON, calibrate_button._start_method)
 		sb_sizer.Add (calibrate_button,  flag=wx.EXPAND, border=5)	
 		
 		# Re-analysed calibration data
@@ -277,6 +282,17 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		############### GUI is created, now generate settings ######################
 		self.CreateSettingsDict()
 	
+	def StopCalibration (self, event) :
+		"""
+		Abort calibration
+		"""
+		self.need_abort = True
+		# Adjusting button's settings
+		button = event.GetEventObject()
+		button.SetLabel (button._start_label)
+		button.SetBackgroundColour('')
+		button.Bind( wx.EVT_BUTTON, button._start_method)
+	
 	def CalibrateSampleSwitcher (self, event) :
 		"""
 		`calibrate_button` was clicked.
@@ -292,7 +308,15 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		
 		initial_position = min(settings["initial_scan_position"], settings["final_scan_position"])
 		final_position = max(settings["initial_scan_position"], settings["final_scan_position"])
-		 
+		
+		# Job started: Adjusting button's settings
+		button = event.GetEventObject()
+		button.SetLabel (button._stop_label)
+		button.SetBackgroundColour('red')
+		button.Bind( wx.EVT_BUTTON, button._stop_method)
+		
+		# Set's get started
+		self.need_abort = False
 		positions = []
 		total_fluorescence = []
 		
@@ -303,12 +327,20 @@ class SampleSwitcherTab (HardwareGUIControl) :
 			total_fluorescence.append( self.parent.Spectrometer.dev.AcquiredData().sum() )
 			positions.append(position) 
 			wx.Yield()
+			# abort, if requested 
+			if self.need_abort : return
 		
 		# Saving measurements
 		self.total_fluorescence = np.array(total_fluorescence)
 		self.positions = np.array(positions)
 		
 		self.AnalyzeTotalFluorescence ()
+		
+		# Job finished: Adjusting button's settings
+		button = event.GetEventObject()
+		button.SetLabel (button._start_label)
+		button.SetBackgroundColour('')
+		button.Bind(wx.EVT_BUTTON, button._start_method)
 		
 	def AnalyzeTotalFluorescence (self, event=None) :
 		"""
