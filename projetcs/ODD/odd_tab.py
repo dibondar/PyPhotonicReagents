@@ -16,7 +16,7 @@ import random
 import multiprocessing
 from functools import partial
 from itertools import repeat, combinations, izip, izip_longest, chain, islice
-from collections import Sequence
+from collections import Counter, Sequence
 import array
 import cPickle as pickle
 from operator import itemgetter 
@@ -1250,23 +1250,22 @@ class ODD_Tab (HardwareGUIControl) :
 			return
 		
 		########################## Analyze pulse shapes ##########################
-		pulse_shaping_options, pulse_shapes = zip(*loaded_pulse_shapes)
 		
 		# Find out what kind of pulse shaping is more popular
-		pulse_shaping_options = map(str, pulse_shaping_options)
-		options = {}
-		for key in pulse_shaping_options :
-			try : options[ key ] += 1
-			except KeyError : options[ key ] = 1
-			
+		options = Counter()
+		for key, _ in izip(*loaded_pulse_shapes) :
+			options[ str(key) ] += 1
+		
 		if len(options) > 1 :
 			print "Warning: Different pulse shaping options have are in the loaded pulses. We select the most popular. The other will be ignored."
-			shaping = max( options.iteritems(), key=itemgetter(1) )[0]
-		else :
-			shaping = options.popitem()[0]
+		shaping = options.most_common(1)[0][0]
+		
+		# Keep pulse shapes only with the right shaping 
+		pulse_shapes = [ pulse for shaping_option, pulse in loaded_pulse_shapes if str(shaping_option) == shaping ]
 		
 		# Define the function converting GA ind into the pulse shaper
 		self.Ind2PulseShape = self.ind2pulse_shape[ shaping ] 
+		
 		############################################################
 		
 		# Set post-processing spectrum function 

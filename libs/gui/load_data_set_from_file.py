@@ -3,9 +3,47 @@ import wx
 import h5py
 import ntpath
 import os
+from collections import defaultdict
 
 from h5py._hl.group import Group as HD5Group
 
+##########################################################################################
+#
+#	Functions for working with tree represented as list of list
+#
+##########################################################################################
+
+def BuildTree (data_set, tree=[]) :
+	"""
+	Built Tree representation (as a nested list of list) of the HDF5 data set `data_set` recursively
+	"""
+	# Looping over the content of `data_set`
+	for key, item in data_set.iteritems() :
+		# Create new node
+		if isinstance(item, HD5Group) :
+			# Since this item is a grope, then recursively load  
+			tree.append( (key, []) )
+			BuildTree(item, tree[-1][-1] )
+		else :
+			# Since this item is a data set, then assign data reference 
+			# that allows to load this data set	
+			tree.append( key )
+	return tree
+		
+def SortTree (tree, reverse=True) :
+	"""
+	Recursively sort the tree assuming that the nodes are numbers otherwise perform lexographic sort 
+	"""
+	key_func = lambda x : ( int(x[0]) if isinstance(x, tuple) else int(x) )
+	try : 
+		tree.sort(key=key_func, reverse=reverse)
+	except ValueError : 
+		tree.sort(reverse=reverse)
+			
+	for node in tree :
+		if isinstance(node, tuple) : 
+			SortTree( node[-1], reverse=reverse )
+				
 ########################################################################################## 
 
 class LoadDataSetDialog (wx.Dialog):
@@ -88,30 +126,32 @@ class LoadDataSetDialog (wx.Dialog):
 		# Save current filename
 		self.filename = os.path.abspath(openFileDialog.GetPath()) 
 		
-		# Construct Tree
-		self.DataTree.DeleteAllItems()
-		
-		root = self.DataTree.AddRoot(ntpath.basename(self.filename))
+		#  Recursively construct tree representation of the HDF file 
 		with h5py.File (self.filename, 'r') as F :
-			self.BuildTreeRecursion( F, root )
+			tree = BuildTree( F )
+			SortTree(tree)
 			
+		# Construct wx GUI Tree by using 
+		self.DataTree.DeleteAllItems()
+		root = self.DataTree.AddRoot(ntpath.basename(self.filename))
+		self.BuildGUITree(tree, root)
 		self.DataTree.Expand(root)
-		
-	def BuildTreeRecursion (self, data_set, parent_id) :
+	
+	def BuildGUITree (self, tree, parent_id,  abs_path='') :
 		"""
-		Built Tree representation of the HDF5 data set `data_set` recursively
+		Initialize wx.TreeCtrl with `tree` recursively
 		"""
-		# Looping over the content of `data_set`
-		for key, item in data_set.iteritems() :
+		for node in tree :
 			# Create new node
-			if isinstance(item, HD5Group) :
-				 # Since this item is a grope, then recursively load  
-				self.BuildTreeRecursion(item, self.DataTree.AppendItem(parent_id, key))
+			if isinstance(node, tuple) : 	
+				 # Since this item is a grope, then recursively load 
+				key = node[0]
+				self.BuildGUITree( node[-1], self.DataTree.AppendItem(parent_id, key), "%s/%s"%(abs_path, key) )
 			else :
 				# Since this item is a data set, then assign data reference 
 				# that allows to load this data set	
-				self.DataTree.AppendItem(parent_id, key, data=wx.TreeItemData(item.name))
-				
+				self.DataTree.AppendItem( parent_id, node, data=wx.TreeItemData("%s/%s"%(abs_path, node)) )
+			
 	def AddDataSet (self, event) :
 		"""
 		Add double clicked data set from tree item into the list
@@ -149,12 +189,10 @@ class LoadDataSetDialog (wx.Dialog):
 		Load data sets as specified by user
 		"""
 		# Sort data sets by file name
-		data_groped = {}
+		data_groped = defaultdict(list)
 		for file_name, data_name in self.data_to_load.itervalues() :
-			try : data_groped[ file_name ].append( data_name )
-			except KeyError :
-				data_groped[ file_name ] =[ data_name ]
-
+			data_groped[ file_name ].append( data_name )
+			
 		def FindValuesForKey (key, F, values=[]) :
 			"""
 			Find `key` recursively in file HDF5 file `F`.
@@ -221,6 +259,8 @@ class LoadPulseShapesDialog (LoadDataSetDialog):
 if __name__ == "__main__":
 	app = wx.App(False)
 	
+	print "Tests\n"
+	
 	# Load pulse shapes
 	dlg = LoadPulseShapesDialog(parent=None, title="Loading pulse shapes from HDF5 files")
 	dlg.ShowModal()
@@ -230,7 +270,7 @@ if __name__ == "__main__":
 	# Load anything
 	dlg = LoadDataSetDialog(parent=None, title="Loading arbitrary data sets")
 	dlg.ShowModal()
-	print "Loaded unmarked data:"
+	print "\nLoaded unmarked data:"
 	print dlg.GetLoadedData()
 	
 	app.MainLoop()
