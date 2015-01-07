@@ -30,6 +30,7 @@ import visvis
 
 from libs.gui.hardware_control import HardwareGUIControl
 from libs.gui.basic_window import SaveSettings 
+from libs.gui.load_data_set_from_file import LoadPulseShapesDialog
 
 from libs.dev.consts import * 
 
@@ -308,12 +309,22 @@ class ODD_Tab (HardwareGUIControl) :
 		num_pulses_ctrl.__label__ = "num_pulses"
 		sb_sizer.Add (num_pulses_ctrl , flag=wx.EXPAND, border=5)
 		
-		# Measure concentration button
+		# Measure concentration button (OLD way)
+		measure_concentr_button = wx.Button (self)  
+		measure_concentr_button._start_label 	= "OLD Measure concentration"
+		measure_concentr_button._start_method 	= self.Old_MeasureConcentration
+		measure_concentr_button._stop_label 	= "STOP measuring concentration"
+		measure_concentr_button._stop_method 	= self.Stop_MeasureConcentration
+		measure_concentr_button.SetLabel (measure_concentr_button._start_label)
+		measure_concentr_button.Bind (wx.EVT_BUTTON, measure_concentr_button._start_method)
+		sb_sizer.Add(measure_concentr_button, flag=wx.EXPAND, border=5) 
+		
+		# Measure concentration button (NEW way)
 		measure_concentr_button = wx.Button (self)  
 		measure_concentr_button._start_label 	= "Measure concentration"
 		measure_concentr_button._start_method 	= self.MeasureConcentration
 		measure_concentr_button._stop_label 	= "STOP measuring concentration"
-		measure_concentr_button._stop_method 	= self.StopMeasureConcentration
+		measure_concentr_button._stop_method 	= self.Stop_MeasureConcentration
 		measure_concentr_button.SetLabel (measure_concentr_button._start_label)
 		measure_concentr_button.Bind (wx.EVT_BUTTON, measure_concentr_button._start_method)
 		sb_sizer.Add(measure_concentr_button, flag=wx.EXPAND, border=5) 
@@ -1023,7 +1034,7 @@ class ODD_Tab (HardwareGUIControl) :
 		button.SetBackgroundColour('')
 		button.Bind( wx.EVT_BUTTON, button._start_method)
 		
-	def MeasureConcentration (self, event) :
+	def Old_MeasureConcentration (self, event) :
 		"""
 		Perform concentration measurement 
 		"""
@@ -1136,10 +1147,7 @@ class ODD_Tab (HardwareGUIControl) :
 			np.hstack( [pulse.spectra[channel].flat for pulse in pulse_shapes] ) for channel in channels_pure  
 		] ).T
 		
-		##################################
-		# TO DO
-		## ADD combinatorial analysis here
-		##############################
+		# This is for debugging purposes
 		
 		self.MeasureSpectra( pulse_shapes )
 		
@@ -1177,8 +1185,152 @@ class ODD_Tab (HardwareGUIControl) :
 		button = event.GetEventObject()
 		button.SetLabel (button._start_label)
 		button.Bind( wx.EVT_BUTTON, button._start_method)
+	
+	def MeasureConcentration (self, event) :
+		"""
+		Perform concentration measurement 
+		"""
+		# Create pseudonyms of necessary devices 
+		self.DevSpectrometer 	= self.parent.Spectrometer.dev
+		self.DevPulseShaper		= self.parent.PulseShaper.dev
+		self.DevSampleSwitcher	= self.parent.SampleSwitcher.dev
+		
+		# Save global settings and get the name of log file
+		measurement_filename = SaveSettings(SettingsNotebook=self.parent, 
+								title="Select file to save concentration measurements", filename="concentrations.hdf5")
+		if measurement_filename is None : return
+		
+		####################### Initiate devices #############################
+		
+		# Initiate spectrometer
+		settings = self.parent.Spectrometer.GetSettings()
+		if self.DevSpectrometer.SetSettings(settings) == RETURN_FAIL : return
+		
+		# Initiate pulse shaper
+		settings = self.parent.PulseShaper.GetSettings()
+		if self.DevPulseShaper.Initialize(settings) == RETURN_FAIL : return
+		
+		# Get number of optimization variables 
+		self.num_pixels = self.DevPulseShaper.GetParamNumber()
+		if self.num_pixels == RETURN_FAIL :
+			raise RuntimeError ("Optimization cannot be started since calibration file was not loaded")
+		
+		# Initiate sample switcher
+		settings = self.parent.SampleSwitcher.GetSettings()
+		if self.DevSampleSwitcher.Initialize(settings) == RETURN_FAIL : return
+		
+		settings = self.GetSettings()
+		
+		# Load channels with mixtures 
+		channels_mixtures 	= sorted( eval( "(%s,)" % settings["channels_mixtures"] ) )
+		channels_pure		= sorted( eval( "(%s,)" % settings["channels"] ) )
+		
+		# Saving the name of all channels containing pure and mixed samples
+		self.channels = sorted(set( channels_pure + channels_mixtures  ))
+		if self.DevSampleSwitcher.GetChannelNum()-1 < max(self.channels) :
+			raise ValueError ("Error: Some channels specified are not accessible by sample switcher.")
+		
+		# Check whether the background signal array is present
+		self.CheckBackground()
+		
+		# Adjusting button's settings
+		self.need_abort = False
+		
+		button = event.GetEventObject()
+		button.SetLabel (button._stop_label)
+		button.Bind( wx.EVT_BUTTON, button._stop_method)
+		
+		########################## Load pulse shapes ##########################
+		dlg = LoadPulseShapesDialog(parent=self, title="Select pulse shapes for measuring concentrations")
+		dlg.ShowModal()
+		loaded_pulse_shapes = dlg.GetLoadedData()
+		dlg.Destroy()
+		if len(loaded_pulse_shapes) == 0 : 
+			# No pulses loaded, then exit
+			return
+		
+		########################## Analyze pulse shapes ##########################
+		pulse_shaping_options, pulse_shapes = zip(*loaded_pulse_shapes)
+		
+		# Find out what kind of pulse shaping is more popular
+		pulse_shaping_options = map(str, pulse_shaping_options)
+		options = {}
+		for key in pulse_shaping_options :
+			try : options[ key ] += 1
+			except KeyError : options[ key ] = 1
+			
+		if len(options) > 1 :
+			print "Warning: Different pulse shaping options have are in the loaded pulses. We select the most popular. The other will be ignored."
+			shaping = max( options.iteritems(), key=itemgetter(1) )[0]
+		else :
+			shaping = options.popitem()[0]
+		
+		# Define the function converting GA ind into the pulse shaper
+		self.Ind2PulseShape = self.ind2pulse_shape[ shaping ] 
+		############################################################
+		
+		# Set post-processing spectrum function 
+		self.SpectrumPostProcess = _SpectrumPostProcess.Select( settings["spectrum_postprocess"] )
+		
+		# This lines allow us to reuse the rest of the code for ODD GA 
+		creator.create("Individual", np.ndarray, spectra=dict)
+		pulse_shapes = map( creator.Individual, pulse_shapes ) 
+
+		################ Concentration determination ################
+		
+		# Measure spectra from all channels 
+		self.ResetLogs()
+		self.MeasureSpectra( pulse_shapes )
+		
+		wx.Yield()
+		# abort, if requested 
+		if self.need_abort : return 
+		
+		# Form fluorescent matrix of pure samples 
+		fluoresence_matrix = np.vstack( [
+			np.hstack( [pulse.spectra[channel].flat for pulse in pulse_shapes] ) for channel in channels_pure  
+		] ).T
+		
+		# This is for debugging purposes
+		
+		self.MeasureSpectra( pulse_shapes )
+		
+		# Calculate concentrations and save the results 
+		with h5py.File (measurement_filename, 'a') as measurement_file :
+			
+			# Create grope where results of concentration measurements will be saved 
+			try : del measurement_file["concentration_measurements"]
+			except KeyError : pass
+			concentration_measurements_grp = measurement_file.create_group("concentration_measurements")
+			
+			# Perform calculations
+			for channel in channels_mixtures :
+				# Create group for individual channel containing mixtures 
+				channel_grp = concentration_measurements_grp.create_group("channel_%d" % channel)
+			
+				# Grope fluorescence spectral data for the studied mixture 
+				mixture_fluorescence = np.hstack( [ pulse.spectra[channel].flat for pulse in pulse_shapes ] )
+			
+				# least square solution using all measured fluorescence data
+				channel_grp["least square concentrations"] = \
+					np.linalg.lstsq( fluoresence_matrix, mixture_fluorescence )[0]
+				
+				# non-negative least square solution
+				channel_grp["non-negative least square concentrations"] = \
+					nnls( fluoresence_matrix, mixture_fluorescence )[0]
 					
-	def StopMeasureConcentration (self, event) :
+				# print the results
+				print "\nResults of concentration determination for channel %d" % channel
+				for method, results in channel_grp.iteritems() :
+					print "\t %s: \n\t\t %s" % (method, "; ".join("%.2e" % r for r in results[...]) )
+		
+		
+		# Adjusting button's settings
+		button = event.GetEventObject()
+		button.SetLabel (button._start_label)
+		button.Bind( wx.EVT_BUTTON, button._start_method)
+		
+	def Stop_MeasureConcentration (self, event) :
 		"""
 		Stop measuring concentration 
 		"""

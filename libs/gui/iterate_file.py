@@ -7,6 +7,7 @@
 
 import wx
 import h5py
+import ntpath
 
 import matplotlib
 matplotlib.use('WXAgg')
@@ -64,7 +65,6 @@ class IterateFile (wx.Frame) :
 		
 		# Construct GUI
 		if title == None : 
-			import ntpath
 			title = "Viewing file [%s]" % ntpath.basename(filename)
 
 		wx.Frame.__init__ (self, parent, title=title)
