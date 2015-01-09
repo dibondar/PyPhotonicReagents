@@ -1252,13 +1252,11 @@ class ODD_Tab (HardwareGUIControl) :
 		########################## Analyze pulse shapes ##########################
 		
 		# Find out what kind of pulse shaping is more popular
-		options = Counter()
-		for key, _ in izip(*loaded_pulse_shapes) :
-			options[ str(key) ] += 1
+		options = Counter( ( str(key) for key, _ in loaded_pulse_shapes ) )
 		
 		if len(options) > 1 :
 			print "Warning: Different pulse shaping options have are in the loaded pulses. We select the most popular. The other will be ignored."
-		shaping = options.most_common(1)[0][0]
+		shaping = options.most_common(1)[0]
 		
 		# Keep pulse shapes only with the right shaping 
 		pulse_shapes = [ pulse for shaping_option, pulse in loaded_pulse_shapes if str(shaping_option) == shaping ]
