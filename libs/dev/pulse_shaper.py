@@ -5,7 +5,8 @@
 ########################################################################
 
 from libs.gui.hardware_control import HardwareGUIControl
-from libs.dev.basic_device import BasicDevice
+from libs.gui.load_data_set_from_file import LoadPulseShapesDialog
+from libs.dev.basic_device import BasicDevice 
 from libs.dev.consts import * 
 
 import numpy as np
@@ -803,10 +804,36 @@ class PulseShaperTab (HardwareGUIControl) :
 		
 		# Transform limited phase 
 		sizer.Add (wx.StaticText(self, label="\nTrasform limited phase (multi-line text)"), flag=wx.LEFT, border=5)
-		transform_lim_phase_ctrl = wx.TextCtrl (self, style=wx.TE_MULTILINE)
-		transform_lim_phase_ctrl.__label__ = "transform_limited_phase"
-		sizer.Add (transform_lim_phase_ctrl, flag=wx.EXPAND, border=5)
+		self.transform_lim_phase_ctrl = wx.TextCtrl (self, style=wx.TE_MULTILINE)
+		self.transform_lim_phase_ctrl.__label__ = "transform_limited_phase"
+		sizer.Add (self.transform_lim_phase_ctrl, flag=wx.EXPAND, border=5)
+		
+		# Button to load transform limited phase
+		load_tl_ctrl = wx.Button (self, label="Load transform limited phase")
+		load_tl_ctrl.Bind (wx.EVT_BUTTON, self.LoadTransformLimited)
+		sizer.Add (load_tl_ctrl, flag=wx.EXPAND, border=5)
 		
 		self.SetSizer(sizer)
 		############### GUI is created, now generate settings ######################
 		self.CreateSettingsDict()
+	
+	def LoadTransformLimited (self, event) :
+		"""
+		Loading transform limited phase from HDFD5 file
+		"""
+		dlg = LoadPulseShapesDialog (parent=self, title="Load transform limited phase from HDF5 file")
+		dlg.ShowModal()
+		tl_phase = dlg.GetLoadedData()
+	
+		if len(tl_phase) == 0 : return
+		if len(tl_phase) > 1 :
+			print "PulseShaper Warning: More then one pulse shape is selected, we will load the last one"
+		
+		tl_phase = tl_phase.pop()
+		
+		if str(tl_phase[0]) == "phase only" :
+			self.transform_lim_phase_ctrl.SetValue( " ".join( str(_) for _ in tl_phase[-1] ) )
+		else :
+			print "PuseShaper Error: Transform limited pulse must be phase-only shaped"
+		
+		dlg.Destroy()

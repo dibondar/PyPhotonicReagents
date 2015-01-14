@@ -326,9 +326,11 @@ class SampleSwitcherTab (HardwareGUIControl) :
 			# Save total intensity
 			total_fluorescence.append( self.parent.Spectrometer.dev.AcquiredData().sum() )
 			positions.append(position) 
-			wx.Yield()
-			# abort, if requested 
-			if self.need_abort : return
+			# Perform check every 10 steps
+			if len(positions) % 10 == 0 : 
+				wx.Yield()
+				# abort, if requested 
+				if self.need_abort : return
 		
 		# Saving measurements
 		self.total_fluorescence = np.array(total_fluorescence)
