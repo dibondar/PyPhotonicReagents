@@ -110,6 +110,7 @@ DRV_IDLE			= 20073
 DRV_TEMPCYCLE 		= 20074
 DRV_NOT_INITIALIZED = 20075
 DRV_USBERROR 		= 20089
+DRV_LOAD_FIRMWARE_ERROR = 20096
 DRV_ERROR_NOCAMERA 	= 20990
 
 ########################################################################
@@ -127,7 +128,7 @@ SpectrometerErrorMsg = { DRV_VXDNOTINSTALLED : "VxD not loaded",
 	DRV_P2INVALID : "Array size is incorrect", DRV_NO_NEW_DATA : "No acquisition has taken place",
 	DRV_TEMP_OFF : "Temperature is OFF", DRV_TEMP_STABILIZED : "Temperature has stabilized at set point",
 	DRV_TEMP_NOT_REACHED : "Temperature has not reached set point", DRV_TEMP_DRIFT : "Temperature had stabilized but has since drifted",
-	DRV_TEMP_NOT_STABILIZED : "Temperature reached but not stabilized"
+	DRV_TEMP_NOT_STABILIZED : "Temperature reached but not stabilized", DRV_LOAD_FIRMWARE_ERROR : "Load firmware error"
 }
 
 

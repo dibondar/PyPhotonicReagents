@@ -1,6 +1,7 @@
 ########################################################################
 #
-#	Wrapper for ODD discrimination algorithm build on DEAP library (http://deap.readthedocs.org/en/latest/api/algo.html)
+# ODD : Measuring concentration of fluorescent proteins using 
+#	motorized filter wheel to shape pulses
 #
 ########################################################################
 # Add main directory to enable imports  
@@ -10,14 +11,13 @@ if __name__ == '__main__' :
 ########################################################################
 
 import wx
-
 # Real time plotting
 import visvis
 
 # GUI components
 from libs.gui.basic_window import BasicWindow
 
-from odd_tab import ODD_Tab
+from odd_tab_filter_wheel import ODD_Tab_FilterWheel
 
 # Hardware
 #from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
@@ -25,7 +25,7 @@ from odd_tab import ODD_Tab
 from libs.dev.camera_istar import ManagerIStarCamera as ManagerSpectrometer
 from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
 
-from libs.dev.pulse_shaper import ManagerShaper, PulseShaperTab
+from libs.dev.motorized_filter_wheel import ManagerFilterWheel, FilterWheelTab
 from libs.dev.sample_switcher import ManagerSampleSwitcher, SampleSwitcherTab
 
 ########################################################################
@@ -34,41 +34,43 @@ class SettingsNotebook (wx.Notebook) :
 	"""
 	GUI for listing all settings
 	"""
-	def __init__(self, parent, DevSpectrometer, DevSampleSwitcher, DevPulseShaper ):
+	def __init__(self, parent, DevSpectrometer, DevSampleSwitcher, FilterWheel ):
 		"""
 		`DevSpectrometer` is a spectrometer manager
 		"""
 		wx.Notebook.__init__(self, parent)
 		
-		self.ODD_GA = ODD_Tab(self)
-		self.AddPage(self.ODD_GA, "ODD GA")
+		self.ODD_FilterWheel = ODD_Tab_FilterWheel(self)
+		self.AddPage(self.ODD_FilterWheel, "ODD")
 		
 		self.Spectrometer = SpectrometerTab(self, DevSpectrometer)
 		self.AddPage (self.Spectrometer, "Spectrometer")
 		 
 		self.SampleSwitcher = SampleSwitcherTab(self, DevSampleSwitcher) 
 		self.AddPage (self.SampleSwitcher, "Sample switcher")
-		 
-		self.PulseShaper = PulseShaperTab(self, DevPulseShaper)
-		self.AddPage (self.PulseShaper, "Pulse shaper")
-
+	
+		self.FilterWheel = FilterWheelTab(self, FilterWheel)
+		self.AddPage (self.FilterWheel, "Filter wheel")
+	
 		# Dictionary to bind names to tabs for saving and loading settings
-		self.settings_to_tabs = {"Spectrometer" : self.Spectrometer, 
-			"PulseShaper" : self.PulseShaper, "ODD_GA" : self.ODD_GA, 
-			"SampleSwitcher" : self.SampleSwitcher  }		
+		self.settings_to_tabs = {
+			"Spectrometer" 		: self.Spectrometer,
+			"ODD_FilterWheel" 	: self.ODD_FilterWheel,
+			"FilterWheel" 		: self.FilterWheel,
+			"SampleSwitcher" 	: self.SampleSwitcher  }		
 
 ########################################################################
 
-class ODDExperiment  (BasicWindow) :
+class ODDExperiment_FilterWheel  (BasicWindow) :
 
 	def __init__ (self, parent) :
 		# Starting spectrometer
 		self.Spectrometer = ManagerSpectrometer()
 		self.SpectrometerProc = self.Spectrometer.start()
 		
-		# Starting pulse shaper
-		self.PulseShaper = ManagerShaper()
-		self.PulseShaperProc = self.PulseShaper.start()
+		# Start motorized filter wheel
+		self.FilterWheel = ManagerFilterWheel()
+		self.FilterWheelProc = self.FilterWheel.start()
 		
 		# Start sample switcher 
 		self.SampleSwitcher = ManagerSampleSwitcher()
@@ -76,7 +78,7 @@ class ODDExperiment  (BasicWindow) :
 		
 		# Create GUI
 		dw, dh = wx.DisplaySize()
-		wx.Frame.__init__ (self, parent, title="ODD for multiple fluoresce marker concentration measurements",
+		wx.Frame.__init__ (self, parent, title="ODD for multiple fluoresce marker concentration measurements using motorized filter wheel",
 								size=(0.9*dw, 0.88*dh) )
 		
 		self.ConstructGUI ()
@@ -88,9 +90,9 @@ class ODDExperiment  (BasicWindow) :
 	def __del__ (self) :	
 		# Close spectrometer
 		self.Spectrometer.exit(); self.SpectrometerProc.join() 
-		
-		# Close pulse shaper
-		self.PulseShaper.exit(); self.PulseShaperProc.join()
+	
+		# Close motorized filter wheel
+		self.FilterWheel.exit(); self.FilterWheelProc.join()
 	
 		# Close sample switcher
 		self.SampleSwitcher.exit(); self.ManagerSampleSwitcherProc.join()
@@ -101,7 +103,7 @@ class ODDExperiment  (BasicWindow) :
 		sizer = wx.GridBagSizer ()
 		
 		############################ Settings Notebook ############################
-		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.SampleSwitcher, self.PulseShaper)
+		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.SampleSwitcher, self.FilterWheel)
 		sizer.Add(self.SettingsNotebook, pos=(0, 0), span=(1, 1), flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT , border=10)
 
 		############################ Command panel ############################
@@ -112,19 +114,6 @@ class ODDExperiment  (BasicWindow) :
 		
 		# Separator
 		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
-	
-		# Separator
-		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
-		
-		# Send random phase to the pulse shaper
-		boxsizer.Add (self.CreateRandomPhaseButton(), flag=wx.EXPAND, border=5)
-		# Send random amplitude to the pulse shaper
-		boxsizer.Add (self.CreateRandomAmplitudeButton(), flag=wx.EXPAND, border=5)
-		# Send zero amplitude and zero phase to the pulse shaper
-		boxsizer.Add (self.CreateZeroAmplitudeButton(), flag=wx.EXPAND, border=5)
-		
-		# Open pulse shaper equalizer
-		boxsizer.Add (self.CreatePulseShaperEqualizerButton(), flag=wx.EXPAND, border=5)
 		
 		# Separator
 		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
@@ -156,5 +145,5 @@ class ODDExperiment  (BasicWindow) :
 if __name__ == '__main__' :
 	app = visvis.use('wx')
 	app.Create()
-	ODDExperiment (None)
+	ODDExperiment_FilterWheel (None)
 	app.Run()

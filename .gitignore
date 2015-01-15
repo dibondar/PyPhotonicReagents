@@ -59,3 +59,5 @@ util/get_transform_limited_phase_nidaqmx - Copy.py
 util/get_transform_limited_phase_nidaqmx.py
 util/get_transform_limited_phase_nidaqmx_polynom.py
 util/test.py
+projetcs/ODD_pulse_shaper/plot_optimization_summary_OLD_FILE.py
+projetcs/ODD_pulse_shaper/test.py

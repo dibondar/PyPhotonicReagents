@@ -268,8 +268,6 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		def OnMoveTo (event) :
 			if self.dev.Initialize( self.GetSettings() ) == RETURN_FAIL : return
 			self.dev.MoveTo( self.moving_stage_position_ctrl.GetValue() )
-			# update the value
-			self.moving_stage_position_ctrl.SetValue( self.dev.GetCurrentPosition() )
 			
 		move_to_button = wx.Button (self, label="Go to")
 		move_to_button.Bind (wx.EVT_BUTTON, OnMoveTo)
