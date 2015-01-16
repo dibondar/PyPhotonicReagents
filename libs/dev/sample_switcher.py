@@ -264,7 +264,7 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		get_current_possition_button.Bind (wx.EVT_BUTTON, OnGetCurrentPosition)
 		sb_sizer.Add (get_current_possition_button,  flag=wx.EXPAND, border=5)
 		
-		# Move-to button
+		# Move-to position button
 		def OnMoveTo (event) :
 			if self.dev.Initialize( self.GetSettings() ) == RETURN_FAIL : return
 			self.dev.MoveTo( self.moving_stage_position_ctrl.GetValue() )
@@ -272,6 +272,28 @@ class SampleSwitcherTab (HardwareGUIControl) :
 		move_to_button = wx.Button (self, label="Go to")
 		move_to_button.Bind (wx.EVT_BUTTON, OnMoveTo)
 		sb_sizer.Add (move_to_button,  flag=wx.EXPAND, border=5)
+		
+		# Spacer
+		sb_sizer.Add (wx.StaticText(self), flag=wx.LEFT, border=5)
+		
+		# Go to sample button
+		def OnMoveToSample (event) :
+			if self.dev.Initialize( self.GetSettings() ) == RETURN_FAIL : return
+			button = event.GetEventObject()
+			# Get current sample number
+			label_split = button.GetLabel().split()
+			sample_num = int(label_split[-1]) 
+			# Get next sample number
+			sample_num = (sample_num + 1) % self.dev.GetChannelNum()
+			# Go to the sample
+			self.dev.MoveToChannel( sample_num )
+			# Update the label
+			label_split[-1] = str(sample_num)
+			button.SetLabel( " ".join(label_split) )
+			
+		move_to_sample = wx.Button (self, label="Go to sample 0")
+		move_to_sample.Bind (wx.EVT_BUTTON, OnMoveToSample)
+		sb_sizer.Add (move_to_sample,  flag=wx.EXPAND, border=5)
 		
 		sizer.Add(sb_sizer, flag=wx.EXPAND, border=5)
 		###################################################################################

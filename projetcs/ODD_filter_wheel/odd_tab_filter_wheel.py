@@ -108,6 +108,17 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 		background_signal_button.Bind ( wx.EVT_BUTTON, self.RecordBackground )
 		sizer.Add (background_signal_button, flag=wx.EXPAND, border=5)
 		
+		# Number of measurements taken sequentially
+		sizer.Add (wx.StaticText(self, label="\nNumber of sequential measurements"), flag=wx.LEFT, border=5)
+		num_seq_measurments_ctrl = wx.SpinCtrl (self, value="1", min=1)
+		num_seq_measurments_ctrl.__label__ = "num_seq_measurments"
+		sizer.Add (num_seq_measurments_ctrl, flag=wx.EXPAND, border=5)
+		
+		# Record spectra manually
+		manualy_record_spectra_button = wx.Button (self, label="Manually record spectra")
+		manualy_record_spectra_button.Bind( wx.EVT_BUTTON, self.ManualyRecordSpectra) 
+		sizer.Add (manualy_record_spectra_button, flag=wx.EXPAND, border=5)
+		
 		# Measure concentration button
 		measure_concentr_button = wx.Button (self)  
 		measure_concentr_button._start_label 	= "Measure concentration"
@@ -203,7 +214,7 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 						
 			dlg = wx.SingleChoiceDialog (self, 'Background sygnal has not been recoreded. Select one of the following option', 
 				'Background signal not found', options.keys(), wx.CHOICEDLG_STYLE ) 
-			
+			dlg.Center()
 			if dlg.ShowModal() == wx.ID_OK :
 				options[ dlg.GetStringSelection() ]()
 			else :
@@ -225,6 +236,9 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 			
 		# Loop over samples
 		for channel in self.channels :
+			# Go to channel
+			self.DevSampleSwitcher.MoveToChannel(channel)
+			
 			# Loop over pulse shapes that are given by the filter
 			for filter in self.filters :
 			
@@ -298,6 +312,7 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 		button = event.GetEventObject()
 		button.SetLabel (button._stop_label)
 		button.Bind( wx.EVT_BUTTON, button._stop_method)
+		button.SetBackgroundColour('red')
 
 		################ Concentration determination ################
 		
@@ -388,7 +403,8 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 		button = event.GetEventObject()
 		button.SetLabel (button._start_label)
 		button.Bind( wx.EVT_BUTTON, button._start_method)
-		
+		button.SetBackgroundColour('')
+	
 	def Stop_MeasureConcentration (self, event) :
 		"""
 		Stop measuring concentration 
@@ -399,3 +415,114 @@ class ODD_Tab_FilterWheel (HardwareGUIControl) :
 		button = event.GetEventObject()
 		button.SetLabel (button._start_label)
 		button.Bind( wx.EVT_BUTTON, button._start_method)
+		button.SetBackgroundColour('')
+		
+	def ManualyRecordSpectra (self, event) :
+		"""
+		Manually record spectra
+		"""
+		# Create pseudonyms of necessary devices 
+		self.DevSpectrometer 	= self.parent.Spectrometer.dev
+		self.DevSampleSwitcher	= self.parent.SampleSwitcher.dev
+		
+		# Save global settings and get the file name
+		measurement_filename = SaveSettings(SettingsNotebook=self.parent, 
+				title="Select file to save manual measurements of spectra", filename="manual_measruments.hdf5")
+		if measurement_filename is None : return
+		
+		####################### Initiate devices #############################
+		
+		# Initiate spectrometer
+		settings = self.parent.Spectrometer.GetSettings()
+		if self.DevSpectrometer.SetSettings(settings) == RETURN_FAIL : return
+		
+		# Initiate sample switcher
+		settings = self.parent.SampleSwitcher.GetSettings()
+		if self.DevSampleSwitcher.Initialize(settings) == RETURN_FAIL : return
+		
+		settings = self.GetSettings()
+		num_seq_measurments = settings["num_seq_measurments"]
+		
+		# Load channels 
+		channels_mixtures 	= sorted( eval( "(%s,)" % settings["channels_mixtures"] ) )
+		channels_pure		= sorted( eval( "(%s,)" % settings["channels"] ) )
+		
+		# Saving the name of all channels containing pure and mixed samples
+		self.channels = sorted(set( channels_pure + channels_mixtures  ))
+		if self.DevSampleSwitcher.GetChannelNum()-1 < max(self.channels) :
+			raise ValueError ("Error: Some channels specified are not accessible by sample switcher.")
+		
+		# Set post-processing spectrum function 
+		self.SpectrumPostProcess = _SpectrumPostProcess.Select( settings["spectrum_postprocess"] )
+		
+		# Check whether the background signal array is present
+		self.CheckBackground()
+		self.ResetLogs()
+		
+		# Save all measurements in file 
+		with h5py.File (measurement_filename, 'a') as measurement_file :
+			
+			try : del measurement_file["manually_measured_spectra"]
+			except KeyError : pass
+			spectra_grp = measurement_file.create_group("manually_measured_spectra")
+
+			# Create group for each C
+			enumerated_channel_grp = [ (C, spectra_grp.create_group("channel_%d" % C)) for C in self.channels ]
+				
+			while True :
+				# Ask user how to label this measurement
+				dlg = wx.TextEntryDialog (self, "Enter the measurement label", caption="Select label for spectrum")
+				if dlg.ShowModal() != wx.ID_OK : break
+				label = dlg.GetValue()
+				
+				for channel, channel_grp in enumerated_channel_grp :
+					if label in channel_grp :
+						wx.MessageDialog(self, "This measurements is ignored because the label has already been used", 
+												caption="Signal not recorder").ShowModal() 
+						break
+					else :
+						# Go to channel
+						self.DevSampleSwitcher.MoveToChannel(channel)
+						
+						measurments_seq_grp = channel_grp.create_group( label )
+						for num in xrange(num_seq_measurments) :
+							# Save measurements
+							spectrum = self.GetSampleSpectrum (channel)
+							measurments_seq_grp[ str(num) ] = spectrum
+							print "Channel %d / %s: total fluorescence %1.3e" % (channel, label, spectrum.sum()) 	
+					print "\n"
+		
+			
+			"""
+			for channel in self.channels :
+				# Go to channel
+				self.DevSampleSwitcher.MoveToChannel(channel)
+				channel_grp = spectra_grp.create_group("channel_%d" % channel)
+				
+				while True :
+					# Ask user how to label this measurement
+					dlg = wx.TextEntryDialog (self, "Enter label for the current measurement of channel %d" % channel, 
+												caption="Select label for spectrum")
+					dlg.Center()
+					if dlg.ShowModal() != wx.ID_OK: break
+					else :
+						label = dlg.GetValue()
+						if label in channel_grp :
+							wx.MessageDialog(self, "This measurements is ignored because the label has already been used", 
+												caption="Signal not recorder").ShowModal() 
+						else :
+							# Save measurements
+							spectrum = self.GetSampleSpectrum (channel)
+							channel_grp[ label ] = spectrum
+							print "Channel %d / %s: total fluorescence %1.3e" % (channel, label, spectrum.sum()) 
+			
+				print "\n"
+			"""
+			#################### Saving log information ####################
+			# Save super long time averages of emission spectra  
+			try : del measurement_file["emission_spectra"] 
+			except KeyError : pass
+			
+			emission_spectra_grp = measurement_file.create_group("emission_spectra")
+			for key, val in self.emission_spectra.iteritems() :
+				emission_spectra_grp[ "channel_%d" % key ] = val
