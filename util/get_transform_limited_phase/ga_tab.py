@@ -124,30 +124,6 @@ class _SpectrumPostProcess :
 
 ########################################################################
 
-def RankingIndividuals (inds) :
-	"""
-	 This function is used to calculate the fitness function in the ODD experiment.
-	 It ranks the tuple of individuals `inds` 
-	 It is assumed that ind.fitness.values corresponds to to the number of the individual `ind` in
-	 the population.
-	"""
-	# Iterator generating fluorescence matrix for the current pulse combination 
-	fluorescence_matrix = izip( *chain(*[ind.spectra.itervalues() for ind in inds]) )
-	N = len(inds)
-	fluorescence_matrix = ( np.array(F).reshape((N,N)) for F in fluorescence_matrix )
-		
-	# calculate the rank (i.e., fitness) of the pulse tuple, 
-	# and the pixel number in spectra 
-	rank, pix_num = max( ( abs(np.linalg.det(F)), pix_num ) 
-							for pix_num, F in enumerate(fluorescence_matrix) )
-									
-	# Find tuple of incidences numbering the utilized individuals
-	ind_tuple = tuple( ind.pix_num for ind in inds )
-									
-	return rank, ind_tuple, pix_num
-
-########################################################################
-
 class GA_Tab (HardwareGUIControl) :
 	"""
 	GUI for GA algorithm 

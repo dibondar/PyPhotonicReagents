@@ -2,6 +2,8 @@ from libs.dev.consts import *
 
 import wx, multiprocessing
 import numpy as np
+import functools 
+import itertools
 
 class PulseShaperEqualizerWindow (wx.Frame) :
 	"""
@@ -21,7 +23,7 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 			raise RuntimeError ("Pulse shaper equalizer cannot be started since calibration file was not loaded")
 		
 		# Limit number of pixels `pixel_number_bound`
-		pixel_number_bound = 70
+		pixel_number_bound = 75
 		if self.NumPixels > pixel_number_bound :
 			print "Pulse Shaper Equalizer: Original number of pixels %d was restricted to %d" % (self.NumPixels, pixel_number_bound)
 			self.NumPixels = pixel_number_bound
@@ -36,7 +38,8 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 
 	def ConstructGUI(self) :
 		self.panel = wx.Panel(self)
-		sizer = wx.GridSizer(rows=3, cols=self.NumPixels+1)
+		
+		sizer = wx.BoxSizer(wx.VERTICAL)
 		
 		# Initialize controls
 		self.amplitude_controls = [ wx.ScrollBar (self.panel, style=wx.SB_VERTICAL) for _ in range(self.NumPixels) ]
@@ -44,24 +47,67 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 		
 		FormatLabel = lambda text : "".join( ( "\n%s" % character for  character in text ) )
 		
-		sizer.Add( wx.StaticText(self.panel, label=FormatLabel("AMPLITUDE"), style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL )
+		#################################### Functional buttons #######################################
+		box_sizer = wx.StaticBoxSizer( wx.StaticBox(self.panel, label="Functions"),  wx.HORIZONTAL)
+		#box_sizer = wx.BoxSizer(wx.HORIZONTAL)
+		
+		# Controls to Clipboard buttons
+		amplitude_shape_clipboard = wx.Button(self.panel, label="Copy amplitude mask to clipboard")
+		amplitude_shape_clipboard.Bind (wx.EVT_BUTTON, 
+			functools.partial(self.Controls2Clipboard, controls=self.amplitude_controls) 
+		)
+		box_sizer.Add(amplitude_shape_clipboard, border=5)
+		
+		
+		phase_shape_clipboard = wx.Button(self.panel, label="Copy phase mask to clipboard")
+		phase_shape_clipboard.Bind (wx.EVT_BUTTON, 
+			functools.partial(self.Controls2Clipboard, controls=self.phase_controls) 
+		)
+		box_sizer.Add(phase_shape_clipboard, border=5)
+		
+		# Spacer
+		box_sizer.Add (wx.StaticText(self.panel), flag=wx.LEFT, border=5)
+		
+		# Clipboard to Controls buttons
+		clipboard_amplitude_shape = wx.Button(self.panel, label="Import from clipboard to amplitude mask")
+		clipboard_amplitude_shape.Bind (wx.EVT_BUTTON, 
+			functools.partial(self.Clipboard2Control, controls=self.amplitude_controls) 
+		)
+		box_sizer.Add(clipboard_amplitude_shape, border=5)
+		
+		clipboard_phase_shape = wx.Button(self.panel, label="Import from clipboard to phase mask")
+		clipboard_phase_shape.Bind (wx.EVT_BUTTON, 
+			functools.partial(self.Clipboard2Control, controls=self.phase_controls) 
+		)
+		box_sizer.Add(clipboard_phase_shape, border=5)
+		
+		#########################################################################################
+		sizer.Add (box_sizer, 0, wx.EXPAND, border=5)
+		
+		#################################### Scroll controls  #######################################
+		grd_sizer = wx.GridSizer(rows=2, cols=self.NumPixels+1)
+		
+		# Amplitude controls panel 
+		grd_sizer.Add( wx.StaticText(self.panel, label=FormatLabel("AMPLITUDE"), style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL )
 		for control in self.amplitude_controls :
 			control.SetScrollbar(0, 2, 100, 2)
 			control.Bind( wx.EVT_SCROLL_CHANGED, self.PulseShapeChanged)
-			sizer.Add(control, 0, wx.EXPAND )
+			grd_sizer.Add(control, 0, wx.EXPAND )
 		
-		# Number the pixels
-		sizer.Add( wx.StaticText(self.panel) )
-		for num in range(1,self.NumPixels+1) :
-			sizer.Add( wx.StaticText(self.panel, label=str(num),style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL ) 
+		## Pixel number labels 
+		#grd_sizer.Add( wx.StaticText(self.panel) )
+		#for num in range(1,self.NumPixels+1) :
+		#	grd_sizer.Add( wx.StaticText(self.panel, label=str(num),style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL ) 
 		
-		sizer.Add( wx.StaticText(self.panel, label=FormatLabel("PHASE"), style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL )
+		# Phase controls panel 
+		grd_sizer.Add( wx.StaticText(self.panel, label=FormatLabel("PHASE"), style=wx.ALIGN_CENTRE_HORIZONTAL), 0, wx.ALIGN_CENTRE_VERTICAL|wx.ALIGN_CENTRE_HORIZONTAL )
 		for control in self.phase_controls :
 			control.SetScrollbar(100, 2, 100, 2)
 			control.Bind( wx.EVT_SCROLL_CHANGED, self.PulseShapeChanged)
-			sizer.Add(control, 0, wx.EXPAND )
-		
+			grd_sizer.Add(control, 0, wx.EXPAND )
 		#########################################################################################
+		sizer.Add (grd_sizer, wx.EXPAND)
+		
 		self.panel.SetSizer(sizer)
 		
 	def Controls2Array (self, controls) :
@@ -69,12 +115,66 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 		Convert potions of scrollbar controls into [0,1] array 
 		"""
 		return np.array( [ 1. - float(ctrl.GetThumbPosition())/(ctrl.GetRange() - ctrl.GetThumbSize()) for ctrl in controls ] )
-	
+		
+	def Array2Controls (self, array, controls) :
+		"""
+		Convert [0,1] array into  potions of scrollbar controls.
+		This function is inverse to self.Controls2Array
+		"""
+		if len(controls) < len(array) :
+			raise ValueError("PulseShaperEqualizer Error: Array size must not exceed number of controls")
+		
+		if len(controls) > len(array) :
+			# Convert to numpy array
+			array = np.array(array, copy=False) 
+			# Linearly interpolate
+			x = np.linspace(0., 1., len(controls))
+			xp = np.linspace(0., 1., array.size)
+			array 	= np.interp(x, xp, array)
+		
+		# Set values of the controls
+		for ctrl, val in itertools.izip(controls, array) :
+			ctrl.SetThumbPosition( (ctrl.GetRange() - ctrl.GetThumbSize())*(1 - val) )
+		
+		# Send data to pulse shaper
+		self.PulseShapeChanged(None)
+		
 	def PulseShapeChanged (self, event) :
 		"""
 		This method is called if a scrollbar controlling the pulse shaper mask is moved.  
 		"""
 		self.PulseShaper.SetAmplPhase( self.Controls2Array(self.amplitude_controls), self.Controls2Array(self.phase_controls) )
+		
+	def  Controls2Clipboard (self, event, controls) :
+		"""
+		Copy the values of controls into the Clipboard as text 
+		"""
+		if wx.TheClipboard.Open() :
+			txt_data = str( self.Controls2Array(controls) )[1:-1]
+			wx.TheClipboard.SetData(wx.TextDataObject(txt_data)) 
+			wx.TheClipboard.Close()
+		else :
+			wx.MessageBox("Unable to open the clipboard", "Error")
+
+	def Clipboard2Control (self, event, controls) :
+		"""
+		Copy the values in clipboard to the representation of controls
+		"""
+		if wx.TheClipboard.Open() :
+		
+			# Copy string from Clipboard
+			#if wx.TheClipboard.IsSupported(wx.DF_TEXT):
+			data = wx.TextDataObject()
+			wx.TheClipboard.GetData(data)		
+			wx.TheClipboard.Close()
+			
+			# Convert string to array
+			data = map(np.float, data.GetText().split())
+			
+			# Set the controls
+			self.Array2Controls(data, controls) 
+		else :
+			wx.MessageBox("Unable to open the clipboard", "Error")
 
 ########################################################################################################
 
