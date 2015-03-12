@@ -48,41 +48,78 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 		FormatLabel = lambda text : "".join( ( "\n%s" % character for  character in text ) )
 		
 		#################################### Functional buttons #######################################
-		box_sizer = wx.StaticBoxSizer( wx.StaticBox(self.panel, label="Functions"),  wx.HORIZONTAL)
-		#box_sizer = wx.BoxSizer(wx.HORIZONTAL)
-		
-		# Controls to Clipboard buttons
+
+		# Amplitude controls to clipboard buttons
 		amplitude_shape_clipboard = wx.Button(self.panel, label="Copy amplitude mask to clipboard")
 		amplitude_shape_clipboard.Bind (wx.EVT_BUTTON, 
 			functools.partial(self.Controls2Clipboard, controls=self.amplitude_controls) 
 		)
-		box_sizer.Add(amplitude_shape_clipboard, border=5)
 		
-		
+		# Phase controls to clipboard buttons
 		phase_shape_clipboard = wx.Button(self.panel, label="Copy phase mask to clipboard")
 		phase_shape_clipboard.Bind (wx.EVT_BUTTON, 
 			functools.partial(self.Controls2Clipboard, controls=self.phase_controls) 
 		)
-		box_sizer.Add(phase_shape_clipboard, border=5)
 		
-		# Spacer
-		box_sizer.Add (wx.StaticText(self.panel), flag=wx.LEFT, border=5)
-		
-		# Clipboard to Controls buttons
+		# Clipboard to amplitude controls buttons
 		clipboard_amplitude_shape = wx.Button(self.panel, label="Import from clipboard to amplitude mask")
 		clipboard_amplitude_shape.Bind (wx.EVT_BUTTON, 
 			functools.partial(self.Clipboard2Control, controls=self.amplitude_controls) 
 		)
-		box_sizer.Add(clipboard_amplitude_shape, border=5)
 		
+		# Clipboard to phase controls buttons
 		clipboard_phase_shape = wx.Button(self.panel, label="Import from clipboard to phase mask")
 		clipboard_phase_shape.Bind (wx.EVT_BUTTON, 
 			functools.partial(self.Clipboard2Control, controls=self.phase_controls) 
 		)
-		box_sizer.Add(clipboard_phase_shape, border=5)
+		
+		# Random amplitude buttons
+		random_ampl = wx.Button(self.panel, label="Random amplitude")
+		random_ampl.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.random.rand(self.NumPixels), self.amplitude_controls)
+		)
+		
+		# Random phase buttons
+		random_phase = wx.Button(self.panel, label="Random phase")
+		random_phase.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.random.rand(self.NumPixels), self.phase_controls)
+		)
+		
+		# Set zero amplitude
+		zero_ampl = wx.Button(self.panel, label="Zero amplitude")
+		zero_ampl.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.zeros(self.NumPixels), self.amplitude_controls)
+		)
+		
+		# Set zero phase
+		zero_phase = wx.Button(self.panel, label="Zero phase")
+		zero_phase.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.zeros(self.NumPixels), self.phase_controls)
+		) 
+		
+		# Set max amplitude
+		max_ampl = wx.Button(self.panel, label="Max amplitude")
+		max_ampl.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.ones(self.NumPixels), self.amplitude_controls)
+		)
+		
+		# Set max phase
+		max_phase = wx.Button(self.panel, label="Max phase")
+		max_phase.Bind (wx.EVT_BUTTON, 
+			lambda _ : self.Array2Controls(np.ones(self.NumPixels), self.phase_controls)
+		)
 		
 		#########################################################################################
-		sizer.Add (box_sizer, 0, wx.EXPAND, border=5)
+		grd_sizer = wx.GridSizer(rows=3, cols=5)
+		grd_sizer.AddMany( [ 
+			(amplitude_shape_clipboard, 0, wx.EXPAND ), (clipboard_amplitude_shape, 0, wx.EXPAND ), 
+			(random_ampl, 0, wx.EXPAND ), (zero_ampl, 0, wx.EXPAND ), (max_ampl, 0, wx.EXPAND ),
+			# New raw
+			(phase_shape_clipboard, 0, wx.EXPAND ), (clipboard_phase_shape, 0, wx.EXPAND ), 
+			(random_phase, 0, wx.EXPAND ), (zero_phase, 0, wx.EXPAND ), (max_phase, 0, wx.EXPAND )		
+		] )
+		
+		sizer.Add (grd_sizer, 0, wx.EXPAND, border=5)
 		
 		#################################### Scroll controls  #######################################
 		grd_sizer = wx.GridSizer(rows=2, cols=self.NumPixels+1)

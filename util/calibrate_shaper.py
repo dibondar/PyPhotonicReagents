@@ -788,10 +788,10 @@ class CalibrateShaper (BasicWindow) :
 			voltage = self.pixel_bundel_value_iter.next()
 			
 			# Set the mask for pixel bundle
-			width = self.SettingsNotebook.CalibrateShaper.pixel_bundle_width.GetValue()
+			width = self.SettingsNotebook.CalibrateShaper.pixel_bundle_width.GetValue() / 2
 			start_pixel_bundle = self.pixel_to_vary.GetValue()
 			mask = np.copy(self.fixed_mask)
-			mask[start_pixel_bundle:(start_pixel_bundle+width)] = voltage
+			mask[ max(start_pixel_bundle-width, 0):min(mask.size, start_pixel_bundle+width) ] = voltage
 			self.PulseShaper.SetMasks( mask, self.fixed_mask)
 		
 			# Getting spectrum

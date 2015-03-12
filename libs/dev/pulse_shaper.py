@@ -76,9 +76,6 @@ class ManagerShaper :
 	
 	def StopDevice(self) :
 		return self.run("StopDevice")
-		
-	def Test (self) : 
-		return self.run ("Test")
 	
 	def SetMasks (self, master_mask, slave_mask) :
 		return self.run ("SetMasks", (master_mask, slave_mask) )
