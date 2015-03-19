@@ -541,11 +541,11 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 		phase = self.ValidateArray(phase)
 	
 		# Add transform limited phase and apply wrapping
-		if self.transform_limited_phase :
+		if self.transform_limited_phase is not None :
 			phase += self.transform_limited_phase
 		
 		# Multiply the amplitude correction
-		if self.ampl_correction :
+		if self.ampl_correction is not None :
 			amplitude *= self.ampl_correction
 		
 		# Enforcing (0,1) value range

@@ -241,10 +241,10 @@ class BasicWindow (wx.Frame) :
 			self.__interact_1d_spectrum__.SetYdata(spectrum)	
 		except AttributeError :
 			if self.wavelengths is None : 
-				self.__interact_1d_spectrum__ = visvis.plot (spectrum)
+				self.__interact_1d_spectrum__ = visvis.plot (spectrum, lw=3)
 				visvis.xlabel ("pixels")
 			else : 
-				self.__interact_1d_spectrum__ = visvis.plot (self.wavelengths, spectrum)
+				self.__interact_1d_spectrum__ = visvis.plot (self.wavelengths, spectrum, lw=3)
 				visvis.xlabel("wavelength (nm)")
 			visvis.ylabel("counts")
 			

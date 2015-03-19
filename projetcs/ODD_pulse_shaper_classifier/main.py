@@ -113,16 +113,6 @@ class ODDExperiment  (BasicWindow) :
 		# Separator
 		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
 	
-		# Separator
-		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
-		
-		# Send random phase to the pulse shaper
-		boxsizer.Add (self.CreateRandomPhaseButton(), flag=wx.EXPAND, border=5)
-		# Send random amplitude to the pulse shaper
-		boxsizer.Add (self.CreateRandomAmplitudeButton(), flag=wx.EXPAND, border=5)
-		# Send zero amplitude and zero phase to the pulse shaper
-		boxsizer.Add (self.CreateZeroAmplitudeButton(), flag=wx.EXPAND, border=5)
-		
 		# Open pulse shaper equalizer
 		boxsizer.Add (self.CreatePulseShaperEqualizerButton(), flag=wx.EXPAND, border=5)
 		

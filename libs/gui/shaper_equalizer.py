@@ -5,6 +5,8 @@ import numpy as np
 import functools 
 import itertools
 
+########################################################################################################
+
 class PulseShaperEqualizerWindow (wx.Frame) :
 	"""
 	Control of pulse shaper using scroll bars to set an arbitrary phase and amplitude.
@@ -114,7 +116,7 @@ class PulseShaperEqualizerWindow (wx.Frame) :
 		grd_sizer.AddMany( [ 
 			(amplitude_shape_clipboard, 0, wx.EXPAND ), (clipboard_amplitude_shape, 0, wx.EXPAND ), 
 			(random_ampl, 0, wx.EXPAND ), (zero_ampl, 0, wx.EXPAND ), (max_ampl, 0, wx.EXPAND ),
-			# New raw
+			# New row
 			(phase_shape_clipboard, 0, wx.EXPAND ), (clipboard_phase_shape, 0, wx.EXPAND ), 
 			(random_phase, 0, wx.EXPAND ), (zero_phase, 0, wx.EXPAND ), (max_phase, 0, wx.EXPAND )		
 		] )

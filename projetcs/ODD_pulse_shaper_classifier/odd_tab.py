@@ -23,7 +23,9 @@ class ODD_Tab (HardwareGUIControl) :
 	GUI to scan chirp
 	"""
 	def __init__ (self, parent) :
-	
+		HardwareGUIControl.__init__(self, parent)
+		sizer = wx.BoxSizer(wx.VERTICAL)
+		
 		# List of positions of channels
 		sizer.Add (wx.StaticText(self, label="Channel number with pure samples for learning"), flag=wx.LEFT, border=5)
 		self.chanel_odd_experiment_ctrl = wx.TextCtrl (self, value="", style=wx.TE_MULTILINE|wx.EXPAND)
@@ -96,6 +98,10 @@ class ODD_Tab (HardwareGUIControl) :
 		background_signal_button = wx.Button (self, label="Record background")
 		background_signal_button.Bind ( wx.EVT_BUTTON, self.RecordBackground )
 		sizer.Add (background_signal_button, flag=wx.EXPAND, border=5)
+		
+		self.SetSizer(sizer)
+		############### GUI is created, now generate settings ######################
+		self.CreateSettingsDict()
 	
 	def RecordBackground (self, event=None) :
 		"""
@@ -229,7 +235,7 @@ class ODD_Tab (HardwareGUIControl) :
 			poly_coeffs[(n-1)*coeff_range.size:n*coeff_range.size, n ] = coeff_range
 		
 		# Chose max amplitude
-		max_ampl = miips_settings["max_ampl"]*np.ones(self.num_pixels)
+		max_ampl = odd_settings["max_ampl"]*np.ones(self.num_pixels)
 		
 		# Arguments of the basis 
 		X = np.linspace(-1., 1., self.num_pixels)
@@ -248,14 +254,16 @@ class ODD_Tab (HardwareGUIControl) :
 		
 		# Start scanning
 		with  h5py.File (self.log_filename, 'a') as log_file :
-			# Moving to channel 
 			for channel in self.channels :
+				# Move to a selected channel 
+				self.DevSampleSwitcher.MoveToChannel(channel)
+		
 				# abort, if requested 
 				wx.Yield()
 				if self.need_abort : break
 				
 				# Looping over pulse shapes
-				for scan_num, coeff in enumerte(poly_coeffs) :
+				for scan_num, coeff in enumerate(poly_coeffs) :
 				
 					# Calculate new phase
 					phase = polynomial_basis(coeff)(X)
@@ -311,11 +319,12 @@ class ODD_Tab (HardwareGUIControl) :
 						
 				# Save the data for the given channel
 				try : del log_file[ str(channel) ]
-				except AttributeError : pass
+				except KeyError : pass
 				
 				channel_grp = log_file.create_group( str(channel) )
 				channel_grp["spectra"] 		= spectra
 				channel_grp["phases_rad"]	= phases_rad
+				channel_grp["amplitudes"]	= amplitudes
 				channel_grp["poly_coeffs"]	= poly_coeffs
 				
 		# Readjust buttons settings

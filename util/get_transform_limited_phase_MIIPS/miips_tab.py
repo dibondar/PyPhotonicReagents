@@ -380,7 +380,7 @@ class MIIPS_Tab (HardwareGUIControl) :
 		print "\nOptimal value of the coefficient (using the Gaussian filter) is ", gauss_max_sum_val
 		
 		# If the difference between methods is great then use the Gaussian filter 
-		if abs(gauss_max_sum_val - fit_max_sum_val)/max(gauss_max_sum_val, fit_max_sum_val) > 0.3 :
+		if abs(gauss_max_sum_val - fit_max_sum_val)/np.abs([gauss_max_sum_val, fit_max_sum_val]).max() > 0.3 :
 			max_sum_val = gauss_max_sum_val
 		else : 
 			max_sum_val = fit_max_sum_val
