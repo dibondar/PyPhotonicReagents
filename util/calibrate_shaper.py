@@ -419,6 +419,7 @@ class CalibrateShaper (BasicWindow) :
 	def GetDispersionPhaseCurves (self, wavelengths, scans, voltages, pixels_edges, 
 		calibration, pixel2lambda_func, pulse_shaper_pixel_num ) :
 		"""
+		Surface calibration:
 		Find dispersion and phase curves based on a result of the method `self.FitSpectralScans`
 			`calibration` is the return of `self.FitSpectralScans`
 		"""
@@ -472,14 +473,26 @@ class CalibrateShaper (BasicWindow) :
 		c_min, c_max = zip(*[ pchip_interpolate(c[0],c[1],[V_min, V_max]) for c in calibration ])
 		c_min = np.array(c_min); c_max = np.array(c_max)
 		
-		offset 		= np.polyfit(logical_pixel_lambda, (best_max*c_min-best_min*c_max)/(best_max-best_min), 3)
-		multiplier	= np.polyfit(logical_pixel_lambda, (c_max-c_min)/(best_max-best_min), 3)
+		# Use different power fits 
+		power_fits = []
+		for power in [1, 3, 5, 7] :
+			offset 		= np.polyfit(logical_pixel_lambda, (best_max*c_min-best_min*c_max)/(best_max-best_min), power)
+			multiplier	= np.polyfit(logical_pixel_lambda, (c_max-c_min)/(best_max-best_min), power)
+			p0=np.append(offset, multiplier)
+			
+			try :
+				popt, _ = curve_fit(Fit_TransmissionC, calibration_values, np.ravel(scans), p0=p0)
+			except RuntimeError : popt = p0
+			
+			# Calculate the Transmission coefficients for plotting 
+			TC_fitted = TransmissionC(calibration_values, popt)
 		
-		popt, _ = curve_fit (Fit_TransmissionC, calibration_values, 
-								np.ravel(scans), p0=np.append(offset, multiplier) )
+			# Calculate fitting error
+			error = np.sum( (TC_fitted - scans)**2 )
+			power_fits.append( (error, popt, TC_fitted) )
 		
-		# Calculate the Transmission coefficients for plotting 
-		TC_fitted = TransmissionC(calibration_values, popt)
+		# Select the best power fit
+		_, popt, TC_fitted = min(power_fits)
 		
 		# Extracted the fitted parameters
 		offset		= popt[:len(popt)/2]

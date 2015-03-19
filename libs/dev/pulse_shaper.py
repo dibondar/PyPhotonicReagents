@@ -86,6 +86,12 @@ class ManagerShaper :
 		Calibration file must be loaded.
 		"""
 		return self.run ("SetAmplPhase", (amplitude, phase) )
+		
+	def GetUnwrappedAmplPhase (self, amplitude, phase) :
+		"""
+		Get actual values of phases (in rads) and amplitude (0, 1)
+		"""
+		return self.run ("GetUnwrappedAmplPhase", (amplitude, phase) )
 	
 	def GetParamNumber (self) :
 		"""
@@ -432,6 +438,11 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 								*Order(master_mask_data["calibration_curve_phase"][...],
 								master_mask_data["calibration_curve_voltage"][...])
 							)
+			# The inverse function to self.master_mask_calibration
+			self.voltage2phase_master_mask  = PchipInterpolator( 	
+								*Order(master_mask_data["calibration_curve_voltage"][...],
+								master_mask_data["calibration_curve_phase"][...])
+							)
 			
 			#################### Slave mask settings #########################
 			slave_mask_data		= calibration_file["calibrated_surface/slave_mask"]
@@ -441,6 +452,11 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 			self.slave_mask_calibration = PchipInterpolator( 	
 								*Order(slave_mask_data["calibration_curve_phase"][...],
 								slave_mask_data["calibration_curve_voltage"][...])
+							)
+			# The inverse function to self.slave_mask_calibration 
+			self.voltage2phase_slave_mask = PchipInterpolator( 	
+								*Order(slave_mask_data["calibration_curve_voltage"][...],
+								slave_mask_data["calibration_curve_phase"][...])
 							)
 			
 		# Verifications
@@ -475,24 +491,13 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 				
 		#################################################################
 		# Set transform limited phase and amplitude correction
-		self.transform_limited_phase = None
-		self.ampl_correction = None
+		if len(transform_limited_phase) :
+			self.transform_limited_phase = self.ValidateArray(transform_limited_phase)
+		else : self.transform_limited_phase = None
 		
-		if len(transform_limited_phase) and len(ampl_correction) :
-			# Simultaneously assign both the corrections 
-			self.ampl_correction, self.transform_limited_phase = self.ValidateAmplPhase( 
-					ampl_correction, transform_limited_phase 
-			)	
-		elif len(transform_limited_phase) :
-			# Assign phase correction only 
-			_, self.transform_limited_phase = self.ValidateAmplPhase( 
-					np.ones_like(transform_limited_phase), transform_limited_phase 
-			)	
-		elif len(ampl_correction) :
-			# Assign amplitude correction only 
-			self.ampl_correction, _ = self.ValidateAmplPhase(
-				ampl_correction, np.zeros_like(ampl_correction)
-			)
+		if len(ampl_correction) :
+			self.ampl_correction = self.ValidateArray(ampl_correction)
+		else : self.ampl_correction = None
 		
 	def __len__ (self) :
 		"""
@@ -500,65 +505,83 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 		"""
 		return self.num_parameters
 	
+	def ValidateArray (self, A) :
+		"""
+		A combined function for checking the amplitude and phases masks
+		"""
+		if A.size != self.pulse_shaper_resolution :
+			if A.size > self.num_parameters :
+				raise ValueError ("PulseShaper Error: the size of amplitude or phase are too large")
+				
+			if A.size < self.num_parameters :
+				# Stretching masks are needed because pixels are bundled
+				x = np.linspace(0.,1.,self.num_parameters)
+				xp = np.linspace(0.,1.,A.size)
+				A 	= np.interp(x, xp, A)
+					
+			# Padding masks
+			pad_width = ( self.initial_pixel, self.pulse_shaper_resolution-self.final_pixel )
+			A = np.pad( A, pad_width, 'constant', constant_values=(A[0], A[-1]) )
+				
+		return A
+			
 	def ValidateAmplPhase (self, amplitude, phase, copy=True) :
 		"""
 		`amplitude` and `phase` array consistency check and convert `phase` into radians.
 		`copy` - controls whether a duplicate of `amplitude` and `phase` needs to be created
-		"""	
-		def CheckArray (A) :
-			"""
-			A combined function for checking the amplitude and phases masks
-			"""
-			if A.size != self.pulse_shaper_resolution :
-				if A.size > self.num_parameters :
-					raise ValueError ("PulseShaper Error: the size of amplitude or phase are too large")
-				
-				if A.size < self.num_parameters :
-					# Stretching masks are needed because pixels are bundled
-					x = np.linspace(0.,1.,self.num_parameters)
-					xp = np.linspace(0.,1.,A.size)
-					A 	= np.interp(x, xp, A)
-					
-				# Padding masks
-				pad_width = ( self.initial_pixel, self.pulse_shaper_resolution-self.final_pixel )
-				A = np.pad( A, pad_width, 'constant', constant_values=(A[0], A[-1]) )
-				
-			return A
-			
+		"""				
 		##########################################################
 		# make sure that the arguments are numpy arrays
 		amplitude 	= np.array(amplitude, copy=copy)
 		phase		= np.array(phase, copy=copy)
 		
 		# Check amplitude
-		amplitude = CheckArray(amplitude)
+		amplitude = self.ValidateArray(amplitude)
 		# Check phase
-		phase = CheckArray(phase)
+		phase = self.ValidateArray(phase)
 	
-		# Enforcing (0,1) value range 
-		amplitude[ np.nonzero(amplitude < 0) ] = 0
-		amplitude[ np.nonzero(amplitude > 1) ] = 1
-
-		phase[ np.nonzero(phase < 0) ] = 0
-		phase[ np.nonzero(phase > 1) ] = 1 
+		# Add transform limited phase and apply wrapping
+		if self.transform_limited_phase :
+			phase += self.transform_limited_phase
+		
+		# Multiply the amplitude correction
+		if self.ampl_correction :
+			amplitude *= self.ampl_correction
+		
+		# Enforcing (0,1) value range
+		np.clip(amplitude, 0, 1, out=amplitude)  
+		phase %= 1.
 	
 		# Scaling `phase` to fit the accessible range from `self.phase_min` to `self.phase_max`
 		phase *= (self.phase_max - self.phase_min)
 		phase += self.phase_min
 	
-		# Add transform limited phase and apply wrapping
-		if self.transform_limited_phase is not None :
-			phase += self.transform_limited_phase
-			phase -= self.phase_min
-			phase %= (self.phase_max - self.phase_min)
-			phase += self.phase_min
+		return amplitude, phase
 		
-		# Multiply the amplitude correction
-		if self.ampl_correction is not None :
-			amplitude *= self.ampl_correction
+	def GetUnwrappedAmplPhase (self, amplitude, phase) :
+		"""
+		Get actual values of phases (in rads) and amplitude (0, 1).
+		This function is inverse to self.__call__
+		"""
+		# Get mask voltages 
+		master_mask, slave_mask = self.__call__(amplitude, phase)
+		
+		# Obtain corresponding slave phases 
+		phase_slave_mask = self.voltage2phase_slave_mask(slave_mask)
+		phase_slave_mask *= self.slave_mask_multiplier
+		phase_slave_mask += self.slave_mask_offset
+		
+		# Obtain corresponding master phases 
+		phase_master_mask = self.voltage2phase_master_mask(master_mask)
+		phase_master_mask *= self.master_mask_multiplier
+		phase_master_mask += self.master_mask_offset
+		
+		# Recover amplitude and phase 
+		amplitude = np.cos( phase_master_mask - phase_slave_mask  )**2
+		phase = phase_master_mask + phase_slave_mask
 		
 		return amplitude, phase
-	
+		
 	def __call__ (self, amplitude, phase, copy=True) :
 		"""
 		Convert amplitude and phase into the pulse shaper masks
@@ -577,19 +600,19 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 		# Get voltages for master mask
 		phase_master_mask -= self.master_mask_offset
 		phase_master_mask /= self.master_mask_multiplier
-		phase_master_mask[ np.nonzero(phase_master_mask > 1) ] = 1
-		phase_master_mask[ np.nonzero(phase_master_mask < 0) ] = 0
+		#phase_master_mask %= 1.
+		np.clip(phase_master_mask, 0, 1, out=phase_master_mask)
 		master_mask = self.master_mask_calibration(phase_master_mask).astype(ShaperInt)
 		
 		# Get voltages for slave mask
 		phase_slave_mask -= self.slave_mask_offset
 		phase_slave_mask /= self.slave_mask_multiplier
-		phase_slave_mask[ np.nonzero(phase_slave_mask > 1) ] = 1
-		phase_slave_mask[ np.nonzero(phase_slave_mask < 0) ] = 0
+		#phase_slave_mask %= 1.
+		np.clip(phase_slave_mask, 0, 1, out=phase_slave_mask)
 		slave_mask = self.slave_mask_calibration(phase_slave_mask).astype(ShaperInt)
 		
 		return master_mask, slave_mask
-				
+		
 		
 class AmplPhase2ShaperMasks :
 	"""
@@ -711,7 +734,8 @@ class PulseShaper (BasicDevice):
 		except AttributeError :
 			print "PulseShaping Warning: Calibration file was not loaded"
 			return RETURN_FAIL
-		return self.SetMasks( self.AmplPhase2ShaperMasks(*arguments, copy=False) )
+	
+		return self.SetMasks( self.AmplPhase2ShaperMasks(*arguments, copy=False) ) 
 			
 	def GetParamNumber (self, arguments=None) :
 		"""
@@ -721,6 +745,17 @@ class PulseShaper (BasicDevice):
 		except AttributeError :
 			print "PulseShaping Warning: Calibration file was not loaded"
 			return RETURN_FAIL
+	
+	def GetUnwrappedAmplPhase (self, arguments) :
+		"""
+		Get actual values of phases (in rads) and amplitude (0, 1)
+		"""
+		try : self.AmplPhase2ShaperMasks 
+		except AttributeError :
+			print "PulseShaping Warning: Calibration file was not loaded"
+			return RETURN_FAIL
+			
+		return  self.AmplPhase2ShaperMasks.GetUnwrappedAmplPhase(*arguments)
 		
 	def Initialize (self, settings) :
 		# Close the port if it is already used

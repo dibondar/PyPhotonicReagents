@@ -1,7 +1,6 @@
 ########################################################################
 #
-#	Implementation of Multiphoton Intrapulse Interference Phase Scan (MIIPS)
-#	Vadim V. Lozovoy, Igor Pastirk, and Marcos Dantus, Optics Letters 29, 775 (2004) 
+#	Wrapper for ODD discrimination algorithm 
 #
 ########################################################################
 # Add main directory to enable imports  
@@ -18,15 +17,16 @@ import visvis
 # GUI components
 from libs.gui.basic_window import BasicWindow
 
-from miips_tab import MIIPS_Tab
+from odd_tab import ODD_Tab
 
 # Hardware
-from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
-from libs.dev.spectrometer_ocean_optics import OceanOpticsSpectrometerTab as SpectrometerTab
-#from libs.dev.camera_istar import ManagerIStarCamera as ManagerSpectrometer
-#from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
+#from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
+#from libs.dev.spectrometer_ocean_optics import OceanOpticsSpectrometerTab as SpectrometerTab
+from libs.dev.camera_istar import ManagerIStarCamera as ManagerSpectrometer
+from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
 
 from libs.dev.pulse_shaper import ManagerShaper, PulseShaperTab
+from libs.dev.sample_switcher import ManagerSampleSwitcher, SampleSwitcherTab
 
 ########################################################################
 
@@ -34,28 +34,32 @@ class SettingsNotebook (wx.Notebook) :
 	"""
 	GUI for listing all settings
 	"""
-	def __init__(self, parent, DevSpectrometer, DevPulseShaper ):
+	def __init__(self, parent, DevSpectrometer, DevSampleSwitcher, DevPulseShaper ):
 		"""
 		`DevSpectrometer` is a spectrometer manager
 		"""
 		wx.Notebook.__init__(self, parent)
 		
-		self.MIIPS = MIIPS_Tab(self)
-		self.AddPage(self.MIIPS, " MIIPS")
+		self.ODD_Tab = ODD_Tab(self)
+		self.AddPage(self.ODD_Tab, "ODD GA")
 		
 		self.Spectrometer = SpectrometerTab(self, DevSpectrometer)
 		self.AddPage (self.Spectrometer, "Spectrometer")
+		 
+		self.SampleSwitcher = SampleSwitcherTab(self, DevSampleSwitcher) 
+		self.AddPage (self.SampleSwitcher, "Sample switcher")
 		 
 		self.PulseShaper = PulseShaperTab(self, DevPulseShaper)
 		self.AddPage (self.PulseShaper, "Pulse shaper")
 
 		# Dictionary to bind names to tabs for saving and loading settings
 		self.settings_to_tabs = {"Spectrometer" : self.Spectrometer, 
-			"PulseShaper" : self.PulseShaper, "MIIPS" : self.MIIPS }		
+			"PulseShaper" : self.PulseShaper, "ODD_Tab" : self.ODD_Tab, 
+			"SampleSwitcher" : self.SampleSwitcher  }		
 
 ########################################################################
 
-class MIIPSExperiment  (BasicWindow) :
+class ODDExperiment  (BasicWindow) :
 
 	def __init__ (self, parent) :
 		# Starting spectrometer
@@ -66,9 +70,13 @@ class MIIPSExperiment  (BasicWindow) :
 		self.PulseShaper = ManagerShaper()
 		self.PulseShaperProc = self.PulseShaper.start()
 		
+		# Start sample switcher 
+		self.SampleSwitcher = ManagerSampleSwitcher()
+		self.ManagerSampleSwitcherProc = self.SampleSwitcher.start()
+		
 		# Create GUI
 		dw, dh = wx.DisplaySize()
-		wx.Frame.__init__ (self, parent, title="Multiphoton Intrapulse Interference Phase Scan (MIIPS) for phase characterization and compensation",
+		wx.Frame.__init__ (self, parent, title="ODD for multiple fluoresce marker concentration measurements",
 								size=(0.9*dw, 0.88*dh) )
 		
 		self.ConstructGUI ()
@@ -84,13 +92,16 @@ class MIIPSExperiment  (BasicWindow) :
 		# Close pulse shaper
 		self.PulseShaper.exit(); self.PulseShaperProc.join()
 	
+		# Close sample switcher
+		self.SampleSwitcher.exit(); self.ManagerSampleSwitcherProc.join()
+	
 	def ConstructGUI (self) :
 		""" Build GUI """
 		self.panel = wx.Panel(self)
 		sizer = wx.GridBagSizer ()
 		
 		############################ Settings Notebook ############################
-		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.PulseShaper)
+		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.SampleSwitcher, self.PulseShaper)
 		sizer.Add(self.SettingsNotebook, pos=(0, 0), span=(1, 1), flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT , border=10)
 
 		############################ Command panel ############################
@@ -101,6 +112,16 @@ class MIIPSExperiment  (BasicWindow) :
 		
 		# Separator
 		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
+	
+		# Separator
+		boxsizer.Add (wx.StaticText(self.panel), flag=wx.EXPAND, border=5)
+		
+		# Send random phase to the pulse shaper
+		boxsizer.Add (self.CreateRandomPhaseButton(), flag=wx.EXPAND, border=5)
+		# Send random amplitude to the pulse shaper
+		boxsizer.Add (self.CreateRandomAmplitudeButton(), flag=wx.EXPAND, border=5)
+		# Send zero amplitude and zero phase to the pulse shaper
+		boxsizer.Add (self.CreateZeroAmplitudeButton(), flag=wx.EXPAND, border=5)
 		
 		# Open pulse shaper equalizer
 		boxsizer.Add (self.CreatePulseShaperEqualizerButton(), flag=wx.EXPAND, border=5)
@@ -135,5 +156,5 @@ class MIIPSExperiment  (BasicWindow) :
 if __name__ == '__main__' :
 	app = visvis.use('wx')
 	app.Create()
-	MIIPSExperiment (None)
+	ODDExperiment (None)
 	app.Run()
