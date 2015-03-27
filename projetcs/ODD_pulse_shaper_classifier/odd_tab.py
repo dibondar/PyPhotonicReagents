@@ -277,6 +277,8 @@ class ODD_Tab (HardwareGUIControl) :
 						# Initialize the array
 						phases_rad = np.zeros( (len(poly_coeffs), phase.size), dtype=phase.dtype )
 						amplitudes = np.zeros_like(phases_rad)
+						amplitudes[:] = ampl.min()
+					
 					# Save phase
 					phases_rad[scan_num] = phase
 					amplitudes[scan_num] = ampl
@@ -293,6 +295,8 @@ class ODD_Tab (HardwareGUIControl) :
 					if scan_num == 0 :
 						# Initialize the array
 						spectra = np.zeros( (len(poly_coeffs), spectrum.size), dtype=spectrum.dtype )
+						spectra[:] = spectrum.min()
+						
 					# Save the spectrum
 					spectra[scan_num] = spectrum
 					
@@ -300,22 +304,22 @@ class ODD_Tab (HardwareGUIControl) :
 					try : 
 						spectra_2d_img.SetData(spectra)
 						phases_rad_2d_img.SetData( phases_rad%(2*np.pi) )
-						amplitudes_2d_img.SetData( amplitudes )
+						#amplitudes_2d_img.SetData( amplitudes )
 					except NameError :
 						visvis.cla(); visvis.clf()
 						
-						visvis.subplot(131)
+						visvis.subplot(121)
 						spectra_2d_img = visvis.imshow(spectra, cm=visvis.CM_JET)
 						visvis.ylabel ('scans'); visvis.xlabel ('wavelegth')
 						visvis.title("spectral scan")
 						
-						visvis.subplot(132)
+						visvis.subplot(122)
 						phases_rad_2d_img = visvis.imshow( phases_rad%(2*np.pi), cm=visvis.CM_JET)
 						visvis.title("phase shapes")
 						
-						visvis.subplot(133)
-						amplitudes_2d_img = visvis.imshow(amplitudes, cm=visvis.CM_JET)
-						visvis.title("amplitudes")
+						#visvis.subplot(133)
+						#amplitudes_2d_img = visvis.imshow(amplitudes, cm=visvis.CM_JET)
+						#visvis.title("amplitudes")
 						
 				# Save the data for the given channel
 				try : del log_file[ str(channel) ]

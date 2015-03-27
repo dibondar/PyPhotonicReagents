@@ -13,6 +13,7 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 import wx, serial, multiprocessing, h5py, time
 from itertools import izip
+from collections import Counter
 
 ########################################################################
 #
@@ -154,7 +155,7 @@ def FindBrokenPixels (min_phase_master_mask, max_phase_master_mask,
 	return np.nonzero( ( RelVariation(min_phase_master_mask, min_phase_slave_mask) > 0.1 )| 
 					   ( RelVariation(max_phase_master_mask, max_phase_slave_mask) > 0.1 ) )[0]
 	
-										 
+################### The following class is under development ###################									 
 class AmplPhase2ShaperMasks_Pixelwise :
 	"""
 	Class for converting amplitudes and phases into the pulse shaper masks 
@@ -168,7 +169,8 @@ class AmplPhase2ShaperMasks_Pixelwise :
 			<pulse_shaper_resolution> -- number of pixels in the shaper
 		"""
 		#super(AmplPhase2ShaperMasks_Basic, self).__init_()
-				
+		raise NotImplementedError("This code is depreciated")
+			
 		self.pulse_shaper_resolution = pulse_shaper_resolution
 		
 		# Loading the calibration file
@@ -243,81 +245,6 @@ class AmplPhase2ShaperMasks_Pixelwise :
 		# Calibration functions: Voltage of the mask as a function of phase
 		self.voltage_function_master_mask = [ PchipInterpolator(*Order(P,V)) for P,V in izip(self.phase_master_mask,self.voltage_master_mask) ]
 		self.voltage_function_slave_mask = [ PchipInterpolator(*Order(P,V)) for P,V in izip(self.phase_slave_mask,self.voltage_slave_mask) ]
-		
-		"""
-		import matplotlib.pyplot as plt
-		
-		ind1 = 30		
-		
-		
-		print self.phase_min[ind1]/np.pi, self.phase_max[ind1]/np.pi
-		
-		plt.subplot(121)
-		plt.title(str(ind1))
-		#VMm = self.voltage_master_mask[ind1]
-		PMm = self.phase_master_mask[ind1]
-		PMm = PchipInterpolator( np.arange(PMm.size), PMm )( np.linspace(0,PMm.size,200) )
-		
-		#VSm = self.voltage_slave_mask[ind1]
-		PSm = self.phase_slave_mask[ind1]
-		PSm = PchipInterpolator( np.arange(PSm.size), PSm )( np.linspace(0,PSm.size,200) )
-		
-		PMm = PMm[:, np.newaxis]
-		PSm = PSm[np.newaxis, :]
-		
-		plt.imshow( (PMm + PSm)/(np.pi) )
-		plt.colorbar()
-		
-		plt.subplot(122)
-		
-		plt.imshow( np.cos(PMm - PSm)**2 )
-		plt.colorbar()
-		
-		plt.show()
-		"""
-		
-		"""
-		import matplotlib.pyplot as plt
-		
-		ind1 = 30		
-		
-		plt.subplot(211)
-		plt.title(str(ind1))
-		VMm = self.voltage_master_mask[ind1]
-		PMm = self.phase_master_mask[ind1]
-		VSm = self.voltage_slave_mask[ind1]
-		PSm = self.phase_slave_mask[ind1]
-		plt.plot( VMm, PMm, 'r')
-		plt.plot( VSm, PSm, 'b')
-		
-		plt.subplot(212)
-		plt.plot( (PMm - PSm.min())/np.pi, 'g' )
-		plt.plot( (PMm - PSm.max())/np.pi, 'y' )
-		plt.show()
-		"""
-		
-		"""
-		import matplotlib.pyplot as plt
-		
-		ind1, ind2 = 67, 66
-		
-		plt.subplot(221)
-		plt.title(str(ind1))
-		plt.plot( self.voltage_master_mask[ind1], self.phase_master_mask[ind1], 'r')
-		plt.plot( self.voltage_slave_mask[ind1], self.phase_slave_mask[ind1], 'b')
-		plt.subplot(222)
-		plt.title(str(ind2))
-		plt.plot( self.voltage_master_mask[ind2], self.phase_master_mask[ind2], 'r')
-		plt.plot( self.voltage_slave_mask[ind2], self.phase_slave_mask[ind2], 'b')
-		plt.show()
-		
-		P = np.linspace(0, self.phase_max, 200)
-		plt.subplot(223)
-		plt.plot( P, self.voltage_function_master_mask[47](P) )
-		plt.subplot(224)
-		plt.plot( P, self.voltage_function_master_mask[48](P) )
-		plt.show()
-		"""
 	
 	def __len__ (self) :
 		"""
@@ -458,7 +385,7 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 								*Order(slave_mask_data["calibration_curve_voltage"][...],
 								slave_mask_data["calibration_curve_phase"][...])
 							)
-			
+		
 		# Verifications
 		assert self.master_mask_offset.size == self.slave_mask_offset.size
 		assert self.master_mask_multiplier.size == self.slave_mask_multiplier.size
@@ -467,29 +394,75 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 			raise ValueError ("Calibration does not match pulse shaper. Recalibrate current pulse shaper")
 			
 		##################################################################
-		# Get bounds in phase variation
 		
+		@np.vectorize
+		def TotalPhaseVariation (min_mm, max_mm, min_sm, max_sm, Condition) :
+			"""
+			Determinate the range of total phase variation with arbitrary amplitudes 
+			in each pixel of pulse shaper 
+			"""
+			# Get phase ranges for both masks
+			bins = 200
+			phase_mm = np.linspace(min_mm, max_mm, bins)[:,np.newaxis]
+			phase_sm = np.linspace(min_sm, max_sm, bins)[np.newaxis,:]
+			
+			diff_phase 	= phase_mm - phase_sm
+			sum_phase 	= phase_mm + phase_sm
+			
+			# get histogram for total phase
+			hist, bin_edges = np.histogram( 
+				np.extract(Condition(diff_phase), sum_phase), bins=bins 
+			)
+	
+			# Find incidences of most common values in histogram
+			indx = np.nonzero( hist == Counter(hist).most_common(1)[0][0] )[0]
+
+			# Return min and max phase
+			return bin_edges[indx.min()+1], bin_edges[indx.max()-1]
+	
+		# Get bounds in phase variation
 		min_phase_master_mask 	= self.master_mask_offset
 		max_phase_master_mask 	= self.master_mask_offset + self.master_mask_multiplier
 		min_phase_slave_mask	= self.slave_mask_offset
 		max_phase_slave_mask	= self.slave_mask_offset + self.slave_mask_multiplier
 		
-		self.phase_min, self.phase_max = GetTotalPhaseBounds (
-				min_phase_master_mask, max_phase_master_mask, 
-				min_phase_slave_mask, max_phase_slave_mask 
-			)
+		################## "plus" case ##################
+		min_phase_plus, max_phase_plus = TotalPhaseVariation(
+			min_phase_master_mask, max_phase_master_mask, 
+			min_phase_slave_mask, max_phase_slave_mask,
+			lambda diff_phase : (diff_phase >= 0)&(diff_phase <= 0.5*np.pi)
+		)
+		################### "minus" case ##################
+		min_phase_minus, max_phase_minus = TotalPhaseVariation(
+			min_phase_master_mask, max_phase_master_mask, 
+			min_phase_slave_mask, max_phase_slave_mask,
+			lambda diff_phase : (diff_phase <= 0)&(diff_phase >= -0.5*np.pi)
+		)
+		
+		cond =( max_phase_minus - min_phase_minus > max_phase_plus - min_phase_plus ) 
+		if cond.sum() > cond.size/2 :
+			# On average, "minus" case gives more phase variation
+			self.phase_min = min_phase_minus
+			self.phase_max = max_phase_minus
+			self.phase_sign = -1
+		else :
+			# On average, "plus" case gives more phase variation
+			self.phase_min = min_phase_plus
+			self.phase_max = max_phase_plus
+			self.phase_sign = +1
+	
+		############### Limit phase variation to [0, 2*pi] ###############
+		self.phase_min = self.phase_min.max()
+		self.phase_max = self.phase_min + 2*np.pi
 			
-		broken_pixels_indx = FindBrokenPixels(	
-				min_phase_master_mask, max_phase_master_mask, 
-				min_phase_slave_mask, max_phase_slave_mask 
-			)
-			
-		if broken_pixels_indx.size :
-			print "Pulse Shaper Calibration Warning: The following pixels may not be well calibrated: "
-			print broken_pixels_indx
-			print "\n"
-				
-		#################################################################
+		################ Consistency check ####################
+		# that the total phase chosen is reachable
+		assert np.all(self.phase_min >= min_phase_master_mask + min_phase_slave_mask), \
+			"Minimal total phase cannot be reached"
+		assert np.all(self.phase_max <= max_phase_master_mask + max_phase_slave_mask), \
+			"Maximal total phase cannot be reached"
+		
+		#######################################################
 		# Set transform limited phase and amplitude correction
 		if len(transform_limited_phase) :
 			self.transform_limited_phase = self.ValidateArray(transform_limited_phase)
@@ -593,23 +566,30 @@ class AmplPhase2ShaperMasks_SurfaceCalibration :
 		#
 		# 		amplitude = np.cos( phase_master_mask - phase_slave_mask  )**2
 		# 		phase = phase_master_mask + phase_slave_mask
-		tmp = np.arccos(np.sqrt(amplitude)) 
+		tmp = np.arccos(np.sqrt(amplitude))
+		tmp *= self.phase_sign
 		phase_master_mask = 0.5*( phase + tmp )
 		phase_slave_mask = 0.5*(  phase - tmp )
 	
 		# Get voltages for master mask
 		phase_master_mask -= self.master_mask_offset
 		phase_master_mask /= self.master_mask_multiplier
-		#phase_master_mask %= 1.
 		np.clip(phase_master_mask, 0, 1, out=phase_master_mask)
-		master_mask = self.master_mask_calibration(phase_master_mask).astype(ShaperInt)
+		#if not np.all(phase_master_mask >= 0.) : print "Problem master < 0"
+		#if not np.all(phase_master_mask <= 1.) : print "Problem master > 1"
+		master_mask = self.master_mask_calibration(phase_master_mask)
+		np.round(master_mask, out=master_mask)
+		master_mask = master_mask.astype(ShaperInt)
 		
 		# Get voltages for slave mask
 		phase_slave_mask -= self.slave_mask_offset
 		phase_slave_mask /= self.slave_mask_multiplier
-		#phase_slave_mask %= 1.
+		#if not np.all(phase_slave_mask >= 0.) : print "Problem slave < 0"
+		#if not np.all(phase_slave_mask <= 1.) : print "Problem slave  > 1"
 		np.clip(phase_slave_mask, 0, 1, out=phase_slave_mask)
-		slave_mask = self.slave_mask_calibration(phase_slave_mask).astype(ShaperInt)
+		slave_mask = self.slave_mask_calibration(phase_slave_mask)
+		np.round(slave_mask, out=slave_mask)
+		slave_mask = slave_mask.astype(ShaperInt)
 		
 		return master_mask, slave_mask
 		
