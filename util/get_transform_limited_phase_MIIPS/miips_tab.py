@@ -198,11 +198,8 @@ class MIIPS_Tab (HardwareGUIControl) :
 		# Pad array if necessary
 		if self.corrections.size < N+1 :
 			self.corrections = np.lib.pad(self.corrections, (0,N+1-self.corrections.size), 'constant', constant_values=0)
-		
-		coeff_val = 0.5*miips_settings["current_coeff_val"]
-		self.corrections[N] += coeff_val
-		if N :
-			self.corrections[0] += coeff_val
+	
+		self.corrections[N] += miips_settings["current_coeff_val"]
 	
 		# plot the data
 		self.PlotReferencePhase(None)
@@ -306,7 +303,7 @@ class MIIPS_Tab (HardwareGUIControl) :
 		
 		for scan_num, coeff in enumerate(coeff_range) :
 			# Get current phase mask
-			current_phase  = 0.5*coeff*( current_polynomial + 1 )
+			current_phase = coeff*current_polynomial
 			current_phase += reference_phase
 			
 			# Check for consistency

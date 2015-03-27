@@ -144,7 +144,7 @@ class ODD_Tab (HardwareGUIControl) :
 				self.background_signal = dict( (channel, 0) for channel in self.channels ) 
 				
 			options = { "record background now" : self.RecordBackground, 
-						"continue optimization without recording background" : SetBackgroundZero }
+						"continue without recording background" : SetBackgroundZero }
 						
 			dlg = wx.SingleChoiceDialog (self, 'Background sygnal has not been recoreded. Select one of the following option', 
 				'Background signal not found', options.keys(), wx.CHOICEDLG_STYLE ) 

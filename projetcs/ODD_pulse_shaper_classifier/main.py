@@ -16,6 +16,7 @@ import visvis
 
 # GUI components
 from libs.gui.basic_window import BasicWindow
+from libs.gui.info_tab import InfoTab
 
 from odd_tab import ODD_Tab
 
@@ -40,8 +41,11 @@ class SettingsNotebook (wx.Notebook) :
 		"""
 		wx.Notebook.__init__(self, parent)
 		
+		self.InfoTab = InfoTab(self) 
+		self.AddPage(self.InfoTab, "Info")
+		
 		self.ODD_Tab = ODD_Tab(self)
-		self.AddPage(self.ODD_Tab, "ODD GA")
+		self.AddPage(self.ODD_Tab, "ODD")
 		
 		self.Spectrometer = SpectrometerTab(self, DevSpectrometer)
 		self.AddPage (self.Spectrometer, "Spectrometer")
@@ -55,7 +59,7 @@ class SettingsNotebook (wx.Notebook) :
 		# Dictionary to bind names to tabs for saving and loading settings
 		self.settings_to_tabs = {"Spectrometer" : self.Spectrometer, 
 			"PulseShaper" : self.PulseShaper, "ODD_Tab" : self.ODD_Tab, 
-			"SampleSwitcher" : self.SampleSwitcher  }		
+			"SampleSwitcher" : self.SampleSwitcher, "Info" : self.InfoTab }		
 
 ########################################################################
 
