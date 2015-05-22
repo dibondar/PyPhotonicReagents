@@ -19,6 +19,7 @@ from libs.gui.basic_window import BasicWindow
 from libs.gui.info_tab import InfoTab
 
 from odd_tab import ODD_Tab
+from combinatorial_chirp_scan import CombinatorialChirpScan_Tab
 
 # Hardware
 #from libs.dev.spectrometer_ocean_optics import ManagerOceanOpticsSpectrometer as ManagerSpectrometer
@@ -47,6 +48,9 @@ class SettingsNotebook (wx.Notebook) :
 		self.ODD_Tab = ODD_Tab(self)
 		self.AddPage(self.ODD_Tab, "ODD")
 		
+		self.CombinatorialChirpScan_Tab = CombinatorialChirpScan_Tab(self)
+		self.AddPage(self.CombinatorialChirpScan_Tab, "Combinatorial scan")
+		
 		self.Spectrometer = SpectrometerTab(self, DevSpectrometer)
 		self.AddPage (self.Spectrometer, "Spectrometer")
 		 
@@ -59,6 +63,7 @@ class SettingsNotebook (wx.Notebook) :
 		# Dictionary to bind names to tabs for saving and loading settings
 		self.settings_to_tabs = {"Spectrometer" : self.Spectrometer, 
 			"PulseShaper" : self.PulseShaper, "ODD_Tab" : self.ODD_Tab, 
+			"CombinatorialScan" : self.CombinatorialChirpScan_Tab,
 			"SampleSwitcher" : self.SampleSwitcher, "Info" : self.InfoTab }		
 
 ########################################################################

@@ -3,7 +3,7 @@ Utilities for removing cosmic rays
 """
 import numpy as np
 
-def replace_britest (img, npixels_to_remove=200 ) :
+def replace_brightest (img, npixels_to_remove=200 ) :
 	"""
 	Replace npixels_to_remove brightest pixels from image by 
 	less brightest values
