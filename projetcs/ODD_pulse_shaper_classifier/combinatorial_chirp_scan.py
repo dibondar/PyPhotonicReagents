@@ -8,7 +8,7 @@ import visvis
 import wx
 import wx.grid
 import h5py
-from itertools import repeat, product, chain
+from itertools import repeat, product, chain, islice, cycle
 from wx.lib.agw.floatspin import FloatSpin as wxFloatSpin
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
@@ -224,7 +224,7 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		
 		# Saving the name of channels 
 		settings = self.GetSettings()
-		self.channels = eval( "(%s,)" % settings["channels"] )
+		self.channels = sorted( eval( "(%s,)" % settings["channels"] ) )
 		if self.DevSampleSwitcher.GetChannelNum()-1 < max(self.channels) :
 			raise ValueError ("Error: Some channels specified are not accessible by sample switcher.")
 		
@@ -263,57 +263,81 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		
 		# Start scanning
 		with  h5py.File (self.log_filename, 'a') as log_file :
+		
 			# Allocate memory for fluorescence signal of all proteins
+			fluorescences =  dict( (C, np.zeros(len(poly_coeffs), dtype=np.int)) for C in self.channels )
 			
-		
-			for channel in self.channels :
-				# Move to a selected channel 
-				self.DevSampleSwitcher.MoveToChannel(channel)
-		
-				# abort, if requested 
-				wx.Yield()
+			# Allocate memory for reference fluoresence
+			ref_fluorescences = dict( (C, []) for C in self.channels ) 
+			
+			# Iterator for polynomial coefficients
+			poly_coeffs_iter = enumerate(poly_coeffs)
+			
+			while True :
+				# Chunk up the data
+				chunk_poly_coeffs = list( islice(poly_coeffs_iter, len(coeff_range)) )
+				
+				# about, if there is nothing to iterate over
+				if len(chunk_poly_coeffs) == 0 : break
+				
+				# abort, if requested
 				if self.need_abort : break
-				
-				# Looping over pulse shapes
-				for scan_num, coeff in enumerate(poly_coeffs) :
-				
-					# Calculate new phase
-					phase = polynomial_basis(coeff)(X)
-				
-					# Set the pulse shape
-					self.DevPulseShaper.SetAmplPhase(max_ampl, phase) 
-					
+		
+				for channel in self.channels :
+					# Move to a selected channel 
+					self.DevSampleSwitcher.MoveToChannel(channel)
+			
 					# abort, if requested 
-					wx.Yield()
 					if self.need_abort : break
 					
-					# Get spectrum sum, i.e., fluorescence
+					# Record reference fluorescence 
+					self.DevPulseShaper.SetAmplPhase(max_ampl, np.zeros_like(max_ampl)) 
 					spectrum_sum = self.GetSampleSpectrum(channel).sum()
+					ref_fluorescences[channel].append( spectrum_sum )
 					
-					if scan_num == 0 :
-						# Initialize the array
-						fluorescence = np.zeros( len(poly_coeffs), dtype=spectrum_sum.dtype )
-						
-					# Save the spectrum
-					fluorescence[scan_num] = spectrum_sum
+					# Looping over pulse shapes
+					for scan_num, coeff in chunk_poly_coeffs :
 					
-					# Display the currently acquired data
-					try : 
-						fluorescence_img.SetYdata( fluorescence )
-					except NameError :
-						visvis.cla(); visvis.clf()
+						# Calculate new phase
+						phase = polynomial_basis(coeff)(X)
+					
+						# Set the pulse shape
+						self.DevPulseShaper.SetAmplPhase(max_ampl, phase) 
 						
-						fluorescence_img = visvis.plot( fluorescence, lw=1 ) 
-						visvis.xlabel("phase masks")
-						visvis.ylabel("Integrated fluorescence")
-						visvis.title("Measured fluorescence")
+						# abort, if requested 
+						wx.Yield()
+						if self.need_abort : break
 						
+						# Get spectrum sum, i.e., fluorescence
+						spectrum_sum = self.GetSampleSpectrum(channel).sum()
+						
+						# Save the spectrum
+						fluorescences[channel][scan_num] = spectrum_sum
+						
+				# Display the currently acquired data
+				try : 
+					for channel, img in fluorescence_imgs.items() :
+						img.SetYdata( fluorescences[channel] )
+				except NameError :
+					visvis.cla(); visvis.clf()
+						
+					# Iterator of colours
+					colour_iter = cycle(['r', 'g', 'b', 'k', 'y'])
+						
+					fluorescence_imgs = dict( (C, visvis.plot( F, lw=1, lc=colour_iter.next() ) ) for C, F  in fluorescences.items() )
+					visvis.xlabel("phase masks")
+					visvis.ylabel("Integrated fluorescence")
+					visvis.title("Measured fluorescence")
+							
+			################ Scanning is over, save the data ########################
+			for channel, fluorescence in  fluorescences.items() :
 				# Save the data for the given channel
 				try : del log_file[ str(channel) ]
 				except KeyError : pass
-				
+						
 				channel_grp = log_file.create_group( str(channel) )
 				channel_grp["fluorescence"]	= fluorescence
+				channel_grp["ref_fluorescence"] = ref_fluorescences[channel]
 				channel_grp["poly_coeffs"]	= poly_coeffs
 				
 		# Readjust buttons settings
