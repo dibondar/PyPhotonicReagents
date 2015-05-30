@@ -33,6 +33,12 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		self.chanel_odd_experiment_ctrl = wx.TextCtrl (self, value="", style=wx.TE_MULTILINE|wx.EXPAND)
 		self.chanel_odd_experiment_ctrl.__label__ = "channels"
 		sizer.Add (self.chanel_odd_experiment_ctrl, flag=wx.EXPAND, border=5)
+		
+		# Filters (on filter wheel) to be used 
+		sizer.Add (wx.StaticText(self, label="Filter numbers"), flag=wx.LEFT, border=5)
+		self.filters_ctrl = wx.TextCtrl (self, value="", style=wx.TE_MULTILINE|wx.EXPAND)
+		self.filters_ctrl.__label__ = "filters"
+		sizer.Add (self.filters_ctrl, flag=wx.EXPAND, border=5)
 	
 		sizer.Add (wx.StaticText(self, label="\nMax amplitude (ND filter)"), flag=wx.LEFT, border=5)
 		max_ampl_ctrl = wxFloatSpin(self, min_val=0, max_val=1, increment=0.01, value=1., digits=3)
@@ -197,7 +203,8 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		self.DevSpectrometer 	= self.parent.Spectrometer.dev
 		self.DevPulseShaper		= self.parent.PulseShaper.dev
 		self.DevSampleSwitcher	= self.parent.SampleSwitcher.dev
-			
+		self.DevFilterWheel		= self.parent.FilterWheel.dev
+		
 		# Save global settings and get the name of log file
 		self.log_filename = SaveSettings(SettingsNotebook=self.parent, 
 								title="Select file to save phase mask scanning", filename="scanning_phase_mask.hdf5")
@@ -222,11 +229,20 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		settings = self.parent.SampleSwitcher.GetSettings()
 		if self.DevSampleSwitcher.Initialize(settings) == RETURN_FAIL : return
 		
+		# Initialize the filter wheel
+		settings = self.parent.FilterWheel.GetSettings()
+		if self.DevFilterWheel.Initialize(settings) == RETURN_FAIL : return
+		
 		# Saving the name of channels 
 		settings = self.GetSettings()
 		self.channels = sorted( eval( "(%s,)" % settings["channels"] ) )
 		if self.DevSampleSwitcher.GetChannelNum()-1 < max(self.channels) :
 			raise ValueError ("Error: Some channels specified are not accessible by sample switcher.")
+			
+		# Saving the name of filter 
+		self.filters = sorted( eval( "(%s,)" % settings["filters"] ) )
+		if self.DevFilterWheel.GetNumFilters() < max(self.filters) :
+			raise ValueError ("Error: Some filters specified are not accessible by filter wheel.")
 		
 		# Check whether the background signal array is present
 		self.CheckBackground()
@@ -265,7 +281,9 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 		with  h5py.File (self.log_filename, 'a') as log_file :
 		
 			# Allocate memory for fluorescence signal of all proteins
-			fluorescences =  dict( (C, np.zeros(len(poly_coeffs), dtype=np.int)) for C in self.channels )
+			fluorescences =  dict( 
+				(key, np.zeros(len(poly_coeffs), dtype=np.int)) for key in product(self.channels, self.filters) 
+			)
 			
 			# Allocate memory for reference fluoresence
 			ref_fluorescences = dict( (C, []) for C in self.channels ) 
@@ -290,11 +308,6 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 					# abort, if requested 
 					if self.need_abort : break
 					
-					# Record reference fluorescence 
-					self.DevPulseShaper.SetAmplPhase(max_ampl, np.zeros_like(max_ampl)) 
-					spectrum_sum = self.GetSampleSpectrum(channel).sum()
-					ref_fluorescences[channel].append( spectrum_sum )
-					
 					# Looping over pulse shapes
 					for scan_num, coeff in chunk_poly_coeffs :
 					
@@ -305,40 +318,60 @@ class CombinatorialChirpScan_Tab (HardwareGUIControl) :
 						self.DevPulseShaper.SetAmplPhase(max_ampl, phase) 
 						
 						# abort, if requested 
-						wx.Yield()
 						if self.need_abort : break
 						
-						# Get spectrum sum, i.e., fluorescence
-						spectrum_sum = self.GetSampleSpectrum(channel).sum()
-						
-						# Save the spectrum
-						fluorescences[channel][scan_num] = spectrum_sum
-						
+						# Looping over filters in filter wheels
+						for filter in self.filters :
+							self.DevFilterWheel.SetFilter(filter)
+							
+							# abort, if requested
+							wx.Yield()
+							if self.need_abort : break
+							
+							# Get spectrum sum, i.e., fluorescence
+							spectrum_sum = self.GetSampleSpectrum(channel).sum()
+							
+							# Save the spectrum
+							fluorescences[ (channel, filter) ][scan_num] = spectrum_sum
+					
+					# Record reference fluorescence 
+					self.DevPulseShaper.SetAmplPhase(max_ampl, np.zeros_like(max_ampl)) 
+					
+					# Go to filters with max transmission (ASSUMING that it has lowest number) 
+					self.DevFilterWheel.SetFilter( min(self.filters) )
+					
+					spectrum_sum = self.GetSampleSpectrum(channel).sum()
+					ref_fluorescences[channel].append( spectrum_sum )
+					
 				# Display the currently acquired data
 				try : 
-					for channel, img in fluorescence_imgs.items() :
-						img.SetYdata( fluorescences[channel] )
+					for key, img in fluorescence_imgs.items() :
+						img.SetYdata( fluorescences[key] )
 				except NameError :
 					visvis.cla(); visvis.clf()
 						
 					# Iterator of colours
 					colour_iter = cycle(['r', 'g', 'b', 'k', 'y'])
 						
-					fluorescence_imgs = dict( (C, visvis.plot( F, lw=1, lc=colour_iter.next() ) ) for C, F  in fluorescences.items() )
+					fluorescence_imgs = dict( 
+						(K, visvis.plot( F, lw=1, lc=colour_iter.next() ) ) for K, F  in fluorescences.items() 
+					)
 					visvis.xlabel("phase masks")
 					visvis.ylabel("Integrated fluorescence")
 					visvis.title("Measured fluorescence")
 							
 			################ Scanning is over, save the data ########################
-			for channel, fluorescence in  fluorescences.items() :
-				# Save the data for the given channel
-				try : del log_file[ str(channel) ]
+			
+			# Delete and create groups corresponding to channel
+			for channel in self.channels :
+				try : del log_file[ "channel_%d" % channel ]
 				except KeyError : pass
-						
-				channel_grp = log_file.create_group( str(channel) )
-				channel_grp["fluorescence"]	= fluorescence
-				channel_grp["ref_fluorescence"] = ref_fluorescences[channel]
-				channel_grp["poly_coeffs"]	= poly_coeffs
+				gchannel_grp = log_file.create_group( "channel_%d" % channel )
+				gchannel_grp["ref_fluorescence"] = ref_fluorescences[channel]
+				gchannel_grp["poly_coeffs"]	= poly_coeffs
+				
+			for channel_filter, fluorescence in  fluorescences.items() :	
+				log_file["channel_%d/filter_%d_fluorescence" % channel_filter ]	= fluorescence
 				
 		# Readjust buttons settings
 		self.StopScannning(event)

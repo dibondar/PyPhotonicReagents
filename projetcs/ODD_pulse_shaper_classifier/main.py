@@ -29,6 +29,7 @@ from libs.dev.camera_istar import IStarCameraTab as SpectrometerTab
 
 from libs.dev.pulse_shaper import ManagerShaper, PulseShaperTab
 from libs.dev.sample_switcher import ManagerSampleSwitcher, SampleSwitcherTab
+from libs.dev.motorized_filter_wheel import ManagerFilterWheel, FilterWheelTab
 
 ########################################################################
 
@@ -36,7 +37,7 @@ class SettingsNotebook (wx.Notebook) :
 	"""
 	GUI for listing all settings
 	"""
-	def __init__(self, parent, DevSpectrometer, DevSampleSwitcher, DevPulseShaper ):
+	def __init__(self, parent, DevSpectrometer, DevSampleSwitcher, DevPulseShaper, DevFilterWheel ):
 		"""
 		`DevSpectrometer` is a spectrometer manager
 		"""
@@ -51,6 +52,9 @@ class SettingsNotebook (wx.Notebook) :
 		self.CombinatorialChirpScan_Tab = CombinatorialChirpScan_Tab(self)
 		self.AddPage(self.CombinatorialChirpScan_Tab, "Combinatorial scan")
 		
+		self.FilterWheel =  FilterWheelTab(self, DevFilterWheel)
+		self.AddPage (self.FilterWheel, "Filter wheel")
+		
 		self.Spectrometer = SpectrometerTab(self, DevSpectrometer)
 		self.AddPage (self.Spectrometer, "Spectrometer")
 		 
@@ -61,10 +65,11 @@ class SettingsNotebook (wx.Notebook) :
 		self.AddPage (self.PulseShaper, "Pulse shaper")
 
 		# Dictionary to bind names to tabs for saving and loading settings
-		self.settings_to_tabs = {"Spectrometer" : self.Spectrometer, 
+		self.settings_to_tabs = { "Spectrometer" : self.Spectrometer, 
 			"PulseShaper" : self.PulseShaper, "ODD_Tab" : self.ODD_Tab, 
 			"CombinatorialScan" : self.CombinatorialChirpScan_Tab,
-			"SampleSwitcher" : self.SampleSwitcher, "Info" : self.InfoTab }		
+			"SampleSwitcher" : self.SampleSwitcher, "Info" : self.InfoTab,
+			"FilterWheel" : self.FilterWheel }		
 
 ########################################################################
 
@@ -82,6 +87,10 @@ class ODDExperiment  (BasicWindow) :
 		# Start sample switcher 
 		self.SampleSwitcher = ManagerSampleSwitcher()
 		self.ManagerSampleSwitcherProc = self.SampleSwitcher.start()
+		
+		# Start filter wheel
+		self.FilterWheel = ManagerFilterWheel()
+		self.FilterWheelProc = self.FilterWheel.start()
 		
 		# Create GUI
 		dw, dh = wx.DisplaySize()
@@ -103,6 +112,9 @@ class ODDExperiment  (BasicWindow) :
 	
 		# Close sample switcher
 		self.SampleSwitcher.exit(); self.ManagerSampleSwitcherProc.join()
+		
+		# Close filter wheel
+		self.FilterWheel.exit(); self.FilterWheelProc.join()
 	
 	def ConstructGUI (self) :
 		""" Build GUI """
@@ -110,7 +122,7 @@ class ODDExperiment  (BasicWindow) :
 		sizer = wx.GridBagSizer ()
 		
 		############################ Settings Notebook ############################
-		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.SampleSwitcher, self.PulseShaper)
+		self.SettingsNotebook = SettingsNotebook(self.panel, self.Spectrometer, self.SampleSwitcher, self.PulseShaper, self.FilterWheel)
 		sizer.Add(self.SettingsNotebook, pos=(0, 0), span=(1, 1), flag=wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT , border=10)
 
 		############################ Command panel ############################
