@@ -26,6 +26,14 @@ class HardwareGUIControl (wx.Panel) :
 		wx.Panel.__init__(self, parent)
 		self.parent = parent
 		self.dev = dev
+		
+	def UpdateProperty (self, control, update_func_name, *args, **kwords) :
+		"""
+		This method is used to intransitively update (via `control`) a particular settings  
+		of the device by calling the function `update_func_name` in the device manager
+		"""
+		if self.dev :
+			getattr(self.dev, update_func_name)( control.GetValue() )
 	
 	def CreateSettingsDict (self) :
 		"""
