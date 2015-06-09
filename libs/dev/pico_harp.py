@@ -46,6 +46,8 @@ class ManagerPicoHarp :
 		self.histogram_buffer = PicoHarp.AllocateBuffer()
 		p = PicoHarp(self.child_connection, self.histogram_buffer)
 		p.start()
+		# Initialize device
+		self.Initialize()
 		return p
 	
 	def StartHistogramMeas (self, tacq=None) :
@@ -61,7 +63,7 @@ class ManagerPicoHarp :
 		"""
 		result = self.parent_connection.recv()
 		self.lock.release()
-		if result === RETURN_FAIL : 
+		if result == RETURN_FAIL : 
 			print "PicoHarp acquisition failed"
 		return  np.frombuffer(self.histogram_buffer.get_obj(), dtype=np.uint)
 		
@@ -122,11 +124,11 @@ class PicoHarp (BasicDevice):
 		self.str_p =  ctypes.create_string_buffer (500)
 		
 		# Extract the Pico Harp library version
-		lib.PH_GetLibraryVersion (str_p)
+		self.lib.PH_GetLibraryVersion (self.str_p)
 		pico_harp_lib_version_dev = "2.3"
-		if str_p.value <> pico_harp_lib_version_dev :
+		if self.str_p.value <> pico_harp_lib_version_dev :
 			print "Warning: The current code was developed for PicoHarp Library version %s. The version of the currently installed library is %s" \
-				% (pico_harp_lib_version_dev, str_p.value)
+				% (pico_harp_lib_version_dev, self.str_p.value)
 				
 		# Pico harp device ID to be utilized
 		self.DEV_INDX = ctypes.c_int(0)
@@ -135,10 +137,10 @@ class PicoHarp (BasicDevice):
 		self.lib.PH_CloseDevice (self.DEV_INDX)
 		
 		# Open the first PicoHarp
-		if self.lib.PH_OpenDevice (DEV_INDX, str_p) < 0 :
+		if self.lib.PH_OpenDevice (self.DEV_INDX, self.str_p) < 0 :
 			raise RuntimeError ("The first Pico Harp could not be opened")
 		
-		print "PicoHarp %s opened" % str_p.value
+		print "PicoHarp %s opened" % self.str_p.value
 		
 		return RETURN_SUCCESS
 		
@@ -151,7 +153,7 @@ class PicoHarp (BasicDevice):
 			raise RuntimeError ("PH_GetWarnings failed")
 		elif warnings > 0 :
 			# Get the warning message
-			if lib.PH_GetWarningsText (self.DEV_INDX, self.str_p, warnings) < 0 :
+			if self.lib.PH_GetWarningsText (self.DEV_INDX, self.str_p, warnings) < 0 :
 				raise RuntimeError("PH_GetWarningsText failed")
 			print self.str_p.value
 			
@@ -216,7 +218,7 @@ class PicoHarp (BasicDevice):
 		"""
 		Return count rates for both channels
 		"""
-		return 	self.lib.PH_GetCountRate (self.DEV_INDX, ctypes.c_int(0)),
+		return 	self.lib.PH_GetCountRate (self.DEV_INDX, ctypes.c_int(0)), \
 				self.lib.PH_GetCountRate (self.DEV_INDX, ctypes.c_int(1))
 		
 	def GetHistogram (self, arguments=None) :
@@ -236,7 +238,7 @@ class PicoHarp (BasicDevice):
 		# Measuring for self.tacq ms
 		ctcdone = 0
 		while ctcdone == 0 : 
-			ctcdone = lib.PH_CTCStatus (self.DEV_INDX)
+			ctcdone = self.lib.PH_CTCStatus (self.DEV_INDX)
 
 		if self.lib.PH_StopMeas (self.DEV_INDX) < 0 :
 			raise RuntimeError ("PH_StopMeas failed") 
@@ -257,6 +259,15 @@ class PicoHarp (BasicDevice):
 	
 		return RETURN_SUCCESS
 	
+	def GetResolution (self, arguments=None) :
+		"""
+		Return time resolution of PicoHarp
+		"""
+		resolution = self.lib.PH_GetResolution (self.DEV_INDX)
+		if resolution < 0 :
+			raise RuntimeError ("PH_GetResolution failed")
+		return resolution
+		
 	####################################################################################
 	def UpdateOffset (self, arguments) :
 		"""
@@ -283,7 +294,7 @@ class PicoHarp (BasicDevice):
 		Interactively update
 		"""
 		if self.lib.PH_SetCFDLevel (self.DEV_INDX, ctypes.c_int(1), arguments[0]) < 0 :
-			print "Interactive update of PH_SetCFDLevel 1 failed") 
+			print "Interactive update of PH_SetCFDLevel 1 failed"
 			return RETURN_FAIL
 		else :
 			return RETURN_SUCCESS
@@ -343,7 +354,7 @@ class PicoHarpTab (HardwareGUIControl) :
 	"""
 	This class represents a GUI controlling properties of PicoHarp.
 	"""
-	def __init__(self, parent, dev) :
+	def __init__(self, parent, dev=None) :
 		HardwareGUIControl.__init__(self, parent, dev)
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
@@ -359,7 +370,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		)
 		
 		# Zero level of channel 0
-		sizer.Add (wx.StaticText(self, label="CFDZeroX0 (mV)"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nCFDZeroX0 (mV)"), flag=wx.LEFT, border=5)
 		CFDZeroX0_ctrl = wx.SpinCtrl (self, value="10", min=0, max=1e3)
 		CFDZeroX0_ctrl.__label__ = "cfdzerox0"
 		sizer.Add (CFDZeroX0_ctrl, flag=wx.EXPAND, border=5)
@@ -379,7 +390,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		)
 		
 		# Zero level of channel 1
-		sizer.Add (wx.StaticText(self, label="CFDZeroX1 (mV)"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nCFDZeroX1 (mV)"), flag=wx.LEFT, border=5)
 		CFDZeroX1_ctrl = wx.SpinCtrl (self, value="10", min=0, max=1e3)
 		CFDZeroX1_ctrl.__label__ = "cfdzerox1"
 		sizer.Add (CFDZeroX1_ctrl, flag=wx.EXPAND, border=5)
@@ -399,7 +410,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		)
 		
 		# Divider
-		sizer.Add (wx.StaticText(self, label="Divider"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nDivider"), flag=wx.LEFT, border=5)
 		syncdiv_ctrl = wx.SpinCtrl (self, value="8", min=1, max=1e3)
 		syncdiv_ctrl.__label__ = "syncdiv"
 		sizer.Add (syncdiv_ctrl, flag=wx.EXPAND, border=5)
@@ -409,7 +420,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		)
 		
 		# Range	
-		sizer.Add (wx.StaticText(self, label="Range"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nRange"), flag=wx.LEFT, border=5)
 		range_ctrl = wx.SpinCtrl (self, value="2", min=0, max=1e6)
 		range_ctrl.__label__ = "range"
 		sizer.Add (range_ctrl, flag=wx.EXPAND, border=5)
@@ -419,7 +430,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		)
 		
 		# Acquisition time
-		sizer.Add (wx.StaticText(self, label="Acquisition time (ms)"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nAcquisition time (ms)"), flag=wx.LEFT, border=5)
 		tacq_ctrl = wx.SpinCtrl (self, value="1000", min=100, max=1e6)
 		tacq_ctrl.__label__ = "tacq"
 		sizer.Add (tacq_ctrl, flag=wx.EXPAND, border=5)
@@ -444,7 +455,92 @@ class PicoHarpTab (HardwareGUIControl) :
 		self.CreateSettingsDict()
 		
 	def StartShowingHistogram (self, event) :
-		pass
+		"""
+		Start continuous measurement of histogram
+		"""
+		if self.dev is None :
+			# PicoHarp manger not been initialized 
+			self.dev = ManagerPicoHarp()
+			self.PicoHarpProc = self.dev.start()
 		
+		# Initialize PicoHarp
+		if self.dev.SetSettings( self.GetSettings() ) == RETURN_FAIL : 
+			raise RuntimeError("PicoHarp settings could not be set")
+	
+		# Start acquisition of histogram
+		self.dev.StartHistogramMeas()
+	
+		# Start displaying histogram
+		self._abort_show_histogram = False
+		wx.CallAfter(self.ShowHistogram)
+	
 	def StopShowingHistogram (self, event) :
-		pass
+		"""
+		Stop showing histogram interactively
+		"""
+		self._abort_show_histogram = True
+		self.dev.StopHistogramMeas()
+		
+		# If self.PicoHarpProc exits then clean-up
+		try :
+			self.PicoHarpProc
+			self.PicoHarp.Exit()
+			self.PicoHarpProc.join() 
+			del self.PicoHarpProc
+			del self.dev
+			self.dev = None
+		except AttributeError : 
+			pass
+			
+	def ShowHistogram (self) :
+		"""
+		Display histogram
+		"""
+		if self._abort_show_histogram  :
+			# Exit
+			return
+			
+		# Get histogram
+		histogram = self.dev.StopHistogramMeas()
+		
+		resolution = self.dev.GetResolution()
+		
+		# Display the histogram
+		try :
+			self.__histogram_plot.SetYdata(histogram)
+		
+			if self._previous_resolution <> resolution :
+				# Resolution changed redraw everything
+				self.__histogram_plot.SetXdata( resolution*1e-3*np.arange(histogram.size) )	
+				self._previous_resolution = resolution
+				
+			# Update max bound histogram
+			if self._previous_hist_max  < histogram.max() or 0.4*self._previous_hist_max > histogram.max() :
+				self._previous_hist_max = 1.1*histogram.max()
+				visvis.gca().SetLimits ( rangeY=(0, self._previous_hist_max) )
+		
+			# Update time cut-off
+			time_cut_off = histogram[ np.nonzero(histogram)[0][-1] ]
+			if self._previous_time_cut_off < time_cut_off or 0.4*self._previous_time_cut_off > time_cut_off :
+				self._previous_time_cut_off = 1.1*time_cut_off
+				visvis.gca().SetLimits ( rangeX=(0, self._previous_time_cut_off) )
+				
+		except AttributeError :
+			# Set up 
+			visvis.cla(); visvis.clf()
+			self.__histogram_plot = visvis.plot (resolution*1e-3*np.arange(histogram.size), histogram, lw=2)
+			visvis.xlabel("time (ns)")
+			visvis.ylabel("counts")
+		
+			# Set constants
+			self._previous_hist_max = histogram.max()
+			self._previous_time_cut_off = histogram[ np.nonzero(histogram)[0][-1] ]
+			self._previous_resolution = resolution
+		
+		# Print count rates 
+		rates = self.dev.GetCountRates() + (histogram.sum(),)
+		visvis.title ( "Count rates: Ch0 %.2e / Ch1 %.2e / histogram %.2e" % rates )
+		
+		# Start acquisition of histogram
+		self.dev.StartHistogramMeas()
+		wx.CallAfter(self.ShowHistogram)
