@@ -459,11 +459,12 @@ class PicoHarpTab (HardwareGUIControl) :
 		# If self.PicoHarpProc exits then clean-up
 		try :
 			self.PicoHarpProc
-			self.PicoHarp.Exit()
+			self.dev.Exit()
 			self.PicoHarpProc.join() 
 			del self.PicoHarpProc
 			del self.dev
 			self.dev = None
+			del self.__histogram_plot
 		except AttributeError : 
 			pass
 			
@@ -502,7 +503,8 @@ class PicoHarpTab (HardwareGUIControl) :
 				
 		except AttributeError :
 			# Set up 
-			visvis.cla(); visvis.clf()
+			visvis.cla()
+			visvis.clf()
 			self.__histogram_plot = visvis.plot (resolution*1e-3*np.arange(histogram.size), histogram, lw=2)
 			visvis.xlabel("time (ns)")
 			visvis.ylabel("counts")

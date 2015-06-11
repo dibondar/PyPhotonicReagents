@@ -35,6 +35,13 @@ class HardwareGUIControl (wx.Panel) :
 		if self.dev :
 			getattr(self.dev, update_func_name)( control.GetValue() )
 	
+	def UpdateSettings (self, *args, **kwords) :
+		"""
+		This method is used to interactively update all hardware settings, if the device is initialized 
+		"""
+		if self.dev :
+			self.dev.SetSettings( self.GetSettings() )
+	
 	def CreateSettingsDict (self) :
 		"""
 		Generate a dictionary with settings that bind to control elements

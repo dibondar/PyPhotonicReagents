@@ -28,7 +28,7 @@ class ManagerNewportMovingStage (BasicManager):
 		"""
 		Start the process controlling Newport moving stage 
 		"""
-		p = NewportMovingStage(self.child_connection, self.histogram_buffer)
+		p = NewportMovingStage(self.child_connection)
 		p.start()
 		return p
 		
@@ -37,7 +37,7 @@ class ManagerNewportMovingStage (BasicManager):
 
 class NewportMovingStage (BasicDevice):
 	"""
-	Control spectrometer hardware 
+	Control Newport moving stage
 	"""
 	def Initialize (self, settings) :
 		# Close the port if it is already used
@@ -131,7 +131,7 @@ class NewportMovingStage (BasicDevice):
 			
 class NewportMovingStageTab (HardwareGUIControl) :
 	"""
-	This class represents a GUI controlling properties of Newport moving stage.
+	This class represents a GUI controlling properties of Newport moving stage
 	"""
 	def __init__(self, parent, dev=None) :
 		HardwareGUIControl.__init__(self, parent, dev)
