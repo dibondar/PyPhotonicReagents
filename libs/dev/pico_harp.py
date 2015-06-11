@@ -6,6 +6,7 @@ PicoHarp (https://www.picoquant.com/products/category/tcspc-and-time-tagging-mod
 """
 
 from libs.gui.hardware_control import HardwareGUIControl
+from libs.dev.basic_manager import BasicManager
 from libs.dev.basic_device import BasicDevice
 from libs.gui.multi_state_button import MultiStateButton
 
@@ -24,20 +25,10 @@ from libs.dev.consts import *
 #
 ########################################################################
 
-class ManagerPicoHarp :
+class ManagerPicoHarp (BasicManager):
 	"""
 	Class that manges the PicoHarp 
 	"""
-	def __init__ (self) :
-		# Create the lock for device 
-		self.lock = multiprocessing.Lock()
-		# Create a pipe for communication
-		self.parent_connection, self.child_connection = multiprocessing.Pipe()
-
-	def __del__ (self) :
-		self.parent_connection.close()
-		self.child_connection.close()
-		
 	def start(self) :
 		"""
 		Start the process controlling PicoHarp
@@ -73,22 +64,6 @@ class ManagerPicoHarp :
 		"""
 		self.StartHistogramMeas(tacq)
 		return self.StopHistogramMeas()
-	
-	def run(self, command, arguments=None) :
-		"""
-		Send the command to the spectrometer through the pipe
-		"""
-		self.lock.acquire()
-		self.parent_connection.send( (command, arguments) )
-		result = self.parent_connection.recv()
-		self.lock.release()
-		return result
-	
-	def __getattr__ (self, name) :
-		"""
-		Redirect all other request to the method `run`
-		"""
-		return functools.partial( self.run, name )
 		
 ###########################################################################
 # constants from Phdefin.h

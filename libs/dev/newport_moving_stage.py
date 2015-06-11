@@ -1,11 +1,11 @@
 """
-
 This module contains classes for controlling and GUI representation of
 Newport moving stage (http://www.newport.com/MFA-Series-Miniature-Steel-Linear-Stages/300762/1033/info.aspx)
 """
 
 from libs.gui.hardware_control import HardwareGUIControl
 from libs.dev.basic_device import BasicDevice
+from libs.dev.basic_manager import BasicManager
 
 import wx
 import serial
@@ -20,20 +20,10 @@ from libs.dev.consts import *
 #
 ########################################################################
 
-class ManagerNewportMovingStage :
+class ManagerNewportMovingStage (BasicManager):
 	"""
 	Class that manges Newport moving stage 
 	"""
-	def __init__ (self) :
-		# Create the lock for device 
-		self.lock = multiprocessing.Lock()
-		# Create a pipe for communication
-		self.parent_connection, self.child_connection = multiprocessing.Pipe()
-
-	def __del__ (self) :
-		self.parent_connection.close()
-		self.child_connection.close()
-	
 	def start(self) :
 		"""
 		Start the process controlling Newport moving stage 
@@ -41,22 +31,6 @@ class ManagerNewportMovingStage :
 		p = NewportMovingStage(self.child_connection, self.histogram_buffer)
 		p.start()
 		return p
-	
-	def run(self, command, arguments=None) :
-		"""
-		Send the command to the spectrometer through the pipe
-		"""
-		self.lock.acquire()
-		self.parent_connection.send( (command, arguments) )
-		result = self.parent_connection.recv()
-		self.lock.release()
-		return result
-	
-	def __getattr__ (self, name) :
-		"""
-		Redirect all other request to the method `run`
-		"""
-		return functools.partial( self.run, name )
 		
 ###########################################################################
 

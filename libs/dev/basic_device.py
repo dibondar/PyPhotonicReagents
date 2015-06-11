@@ -39,7 +39,7 @@ class BasicDevice (multiprocessing.Process):
 			# Find method matching the command 
 			try : method = getattr(self, command)
 			except AttributeError :
-				print "\n\nPulse Shaper Error : Unrecognised command: " + command
+				print "\n\nError : Unrecognised command: " + command
 				result = RETURN_FAIL
 				continue
 			
