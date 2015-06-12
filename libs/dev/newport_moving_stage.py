@@ -10,6 +10,7 @@ from libs.dev.basic_manager import BasicManager
 import wx
 import serial
 import functools
+import numpy as np
 import multiprocessing
 from libs.dev.consts import * 
 
@@ -39,7 +40,7 @@ class NewportMovingStage (BasicDevice):
 	"""
 	Control Newport moving stage
 	"""
-	def Initialize (self, settings) :
+	def SetSettings (self, settings) :
 		# Close the port if it is already used
 		try : del self.serial_port
 		except AttributeError : pass 
@@ -128,7 +129,102 @@ class NewportMovingStage (BasicDevice):
 		return self.WaitUntillStops()
 		
 ###########################################################################
+
+class JoystickBinding (multiprocessing.Process) :
+	"""
+	Class realizing binding of joystick to moving stage 
+	"""
+	def __init__ (self, MovingStage, joystick_event, *args, **kwargs) :
+		"""
+		MovingStage -- manager of moving stage
+		joystick_event - multiprocessing.Event to indicate when the joystic is on
+		"""
+		self.MovingStage = MovingStage
+		self.joystick_event = joystick_event
+		multiprocessing.Process.__init__(self, *args, **kwargs)
+	
+	def Initialize (self) :
+		"""
+		Initialize joystick via pygame
+		"""
+		# Initializing joystick
+		import pygame
+		self.pygame = pygame
+		self.pygame.init()
+		self.pygame.joystick.init()
+		
+		if self.pygame.joystick.get_count() == 0 or not self.pygame.joystick.get_init() :
+			raise RuntimeError("No joystick is detected!")
+		
+		if self.pygame.joystick.get_count() <> 1 :
+			print "Multiple joysticks are detected: the first one will be utilized"
+	
+		self.joystick = pygame.joystick.Joystick(0)
+		self.joystick.init ()
+		print 'Joystick "%s" was initialized' % self.joystick.get_name() 
+		
+	def UpdateMovingStagePos (self) :
+		"""
+		Update poisonings of moving stages based on the positions of joystick
+		"""
+		# Values of the joystick control so that motion is not detected
+		motion_cut_off = 0.1
+		
+		# reading off the position of the joystick 
+		# Note that the labels are transposed to align the joystick with the moving stage
+		possition = np.array( [ self.joystick.get_axis(n) for n in [0,1,3] ] )
+		
+		# Find which axis are below cut off
+		indx = ( np.abs(possition) < motion_cut_off )
+		
+		if indx.sum() < indx.size  :  
+			# User moved joystick
+				
+			# Check whether the moving stage does not move
+			if self.MovingStage.IsMoving() :
+				
+				# The rudder control is used to scale the step size
+				scale = 0.05*(1. - self.joystick.get_axis(2))
+				possition *= scale
+					
+				# Do not change values of axis if it is bellow cut off
+				possition[indx] = 0
 			
+				# If joystick trigger button is on, then move z-axis only
+				if self.joystick.get_button(0) :
+					possition[:2] = 0
+					possition[2] *= 0.1
+				else : 
+					# otherwise move x-y only
+					possition[2] = 0
+			
+				# The moving stage is ready to be moved
+				self.MovingStage.MoveRel( tuple(possition) )
+		
+			# Clearing the event stack
+			self.pygame.event.clear ()	
+	
+	def  Stop (self) :
+		self.joystick.quit ()
+		self.pygame.joystick.quit()
+		self.pygame.quit ()
+	
+	def run (self) :
+		"""
+		Overloaded function provided by multiprocessing.Process. Called upon start() signal 
+		"""
+		# Initialize joystick
+		self.Initialize()
+
+		# Continue linking joystick until user quits
+		while self.joystick_event.is_set() :
+			self.UpdateMovingStagePos()
+		
+		# Releasing resources
+		self.Stop()		
+		
+###########################################################################
+
 class NewportMovingStageTab (HardwareGUIControl) :
 	"""
 	This class represents a GUI controlling properties of Newport moving stage
@@ -144,7 +240,49 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		port_name.__label__ = "port"
 		sizer.Add (port_name, flag=wx.EXPAND, border=5)
 		
+		# Spacer
+		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
+		
+		# Button to start joystick
+		bind_joystick_button = MultiStateButton(self, 
+			actions=[self.StartJoystick, self.StopJoystick], 
+			labels=["Start joystick", "STOP joystick"] 
+		)
+		sizer.Add (bind_joystick_button, flag=wx.EXPAND, border=5)
+		
 		self.SetSizer(sizer)
 		############### GUI is created, now generate settings ######################
 		
 		self.CreateSettingsDict()
+		
+	def StartJoystick (self, event) :
+		"""
+		Bind joystick to moving stage
+		"""
+		if self.dev is None :
+			# Moving stage manager has not been initialized
+			self.dev = NewportMovingStage()
+			self._NewportMovingStageProc = self.dev.start()
+		
+		# Start joystick binding
+		self.joystick_event = multiprocessing.Event()
+		self.joystick_event.set ()
+		JoystickBinding (self.dev, self.joystick_event).start()
+		
+	def StopJoystick (self, event) :
+		"""
+		Stop joystick-moving stage binding
+		"""
+		# Send the signal to stop synchronizing joystick
+		self.joystick_event.clear()
+	
+		# If self._NewportMovingStageProc exits then clean-up
+		try :
+			self._NewportMovingStageProc
+			self.dev.Exit()
+			self._NewportMovingStageProc.join() 
+			del self._NewportMovingStageProc
+			del self.dev
+			self.dev = None
+		except AttributeError : 
+			pass

@@ -26,7 +26,7 @@ import numpy as np
 #
 ########################################################################
 
-class ManagerThorlabsCamera :
+class ManagerThorlabsCamera (BasicManager):
 	"""
 	Class that manges Thorlabs cameras 
 	"""	
@@ -41,14 +41,14 @@ class ManagerThorlabsCamera :
 		self.Initialize()
 		return p
 	
-	def StartImgAqusition (self) :
+	def StartImgAcquisition (self) :
 		"""
 		Start acquiring image in a parallel fashion
 		"""
 		self.lock.acquire()
 		self.parent_connection.send( ("GetImage", None) )
 	
-	def StopImgAqusition (self) :
+	def StopImgAcquisition (self) :
 		"""
 		Wait till the image acquisition finished and return a reference  
 		"""
@@ -62,8 +62,8 @@ class ManagerThorlabsCamera :
 		"""
 		Acquire histogram sequentially
 		"""
-		self.StartImgAqusition()
-		return self.StopImgAqusition()
+		self.StartImgAcquisition()
+		return self.StopImgAcquisition()
 		
 ###########################################################################
 # constants
@@ -183,13 +183,13 @@ class ThorlabsCamera (BasicDevice):
 		
 ###########################################################################
 
-class NewportMovingStageTab (HardwareGUIControl) :
+class ThorlabsCameraTab (HardwareGUIControl) :
 	"""
-	This class represents a GUI controlling properties of Newport moving stage
+	This class represents a GUI controlling properties of Thorlabs camera
 	"""
 	def __init__(self, parent, dev=None) :
 		HardwareGUIControl.__init__(self, parent, dev)
-		
+	 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		
 		# Check-box to draw gun-sight
@@ -206,7 +206,7 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		gun_sight_radius_ctrl.__label__ = "radius"
 		sizer.Add (gun_sight_radius_ctrl, flag=wx.EXPAND, border=5)
 		# Enable interactive update 
-		offset_ctrl.Bind (wx.EVT_SPINCTRL, self.UpdateSettings)
+		gun_sight_radius_ctrl.Bind (wx.EVT_SPINCTRL, self.UpdateSettings)
 		
 		# Spacer
 		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
@@ -230,7 +230,7 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		if self.dev is None :
 			# Thorlabs camera manger not been initialized 
 			self.dev = ManagerThorlabsCamera()
-			self.ThorlabsCameraProc = self.dev.start()
+			self._ThorlabsCameraProc = self.dev.start()
 		
 		# Start acquisition of image
 		self.dev.StartImgAqusition()
@@ -246,12 +246,12 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		self._abort_img = True
 		self.dev.StopImgAqusition()
 		
-		# If self.ThorlabsCameraProc exits then clean-up
+		# If self._ThorlabsCameraProc exits then clean-up
 		try :
-			self.ThorlabsCameraProc
+			self._ThorlabsCameraProc
 			self.dev.Exit()
-			self.ThorlabsCameraProc.join() 
-			del self.ThorlabsCameraProc
+			self._ThorlabsCameraProc.join() 
+			del self._ThorlabsCameraProc
 			del self.dev
 			self.dev = None
 			del self._img_plot
@@ -262,7 +262,7 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		"""
 		Draw image
 		"""
-		if self._abort_show_histogram  :
+		if self._abort_img  :
 			# Exit
 			return
 		
@@ -276,7 +276,7 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		except AttributeError :
 			visvis.cla()
 			visvis.clf()
-			self._img_plot = visvis.imshow(img, cm=visvis.CM_JET)
+			self._img_plot = visvis.imshow(img)
 			visvis.title ('Camera view')
 			ax = visvis.gca()
 			ax.axis.xTicks = []

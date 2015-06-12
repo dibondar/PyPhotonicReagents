@@ -436,7 +436,7 @@ class PicoHarpTab (HardwareGUIControl) :
 		if self.dev is None :
 			# PicoHarp manger not been initialized 
 			self.dev = ManagerPicoHarp()
-			self.PicoHarpProc = self.dev.start()
+			self._PicoHarpProc = self.dev.start()
 		
 		# Initialize PicoHarp
 		if self.dev.SetSettings( self.GetSettings() ) == RETURN_FAIL : 
@@ -456,15 +456,15 @@ class PicoHarpTab (HardwareGUIControl) :
 		self._abort_show_histogram = True
 		self.dev.StopHistogramMeas()
 		
-		# If self.PicoHarpProc exits then clean-up
+		# If self._PicoHarpProc exits then clean-up
 		try :
-			self.PicoHarpProc
+			self._PicoHarpProc
 			self.dev.Exit()
-			self.PicoHarpProc.join() 
-			del self.PicoHarpProc
+			self._PicoHarpProc.join() 
+			del self._PicoHarpProc
 			del self.dev
 			self.dev = None
-			del self.__histogram_plot
+			del self._histogram_plot
 		except AttributeError : 
 			pass
 			
@@ -483,11 +483,11 @@ class PicoHarpTab (HardwareGUIControl) :
 		
 		# Display the histogram
 		try :
-			self.__histogram_plot.SetYdata(histogram)
+			self._histogram_plot.SetYdata(histogram)
 		
 			if self._previous_resolution <> resolution :
 				# Resolution changed redraw everything
-				self.__histogram_plot.SetXdata( resolution*1e-3*np.arange(histogram.size) )	
+				self._histogram_plot.SetXdata( resolution*1e-3*np.arange(histogram.size) )	
 				self._previous_resolution = resolution
 				
 			# Update max bound histogram
@@ -505,7 +505,7 @@ class PicoHarpTab (HardwareGUIControl) :
 			# Set up 
 			visvis.cla()
 			visvis.clf()
-			self.__histogram_plot = visvis.plot (resolution*1e-3*np.arange(histogram.size), histogram, lw=2)
+			self._histogram_plot = visvis.plot (resolution*1e-3*np.arange(histogram.size), histogram, lw=2)
 			visvis.xlabel("time (ns)")
 			visvis.ylabel("counts")
 		
