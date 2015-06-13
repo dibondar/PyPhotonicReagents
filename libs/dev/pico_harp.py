@@ -330,7 +330,7 @@ class PicoHarpTab (HardwareGUIControl) :
 	This class represents a GUI controlling properties of PicoHarp.
 	"""
 	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev)
+		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerPicoHarp)
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		

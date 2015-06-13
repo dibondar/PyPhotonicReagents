@@ -188,9 +188,12 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 	This class represents a GUI controlling properties of Thorlabs camera
 	"""
 	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev)
+		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerThorlabsCamera)
 	 
 		sizer = wx.BoxSizer(wx.VERTICAL)
+		
+		# Spacer
+		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
 		
 		# Check-box to draw gun-sight
 		draw_gun_sight_ctl = wx.CheckBox(self, label="Draw gun-sight")
@@ -200,7 +203,7 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 		draw_gun_sight_ctl.Bind(wx.EVT_CHECKBOX, self.UpdateSettings)
 		
 		# Radius of gun-sight
-		sizer.Add (wx.StaticText(self, label="Gun-sight radius"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nGun-sight radius"), flag=wx.LEFT, border=5)
 		gun_sight_radius_ctrl = wx.SpinCtrl (self, value="43", min=0, 
 											max=min(CAMERA_IMG_WIDTH, CAMERA_IMG_HIGHT) )
 		gun_sight_radius_ctrl.__label__ = "radius"

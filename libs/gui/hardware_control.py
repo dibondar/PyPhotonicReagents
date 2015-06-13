@@ -18,14 +18,16 @@ class HardwareGUIControl (wx.Panel) :
 	Note that the children of this class must call method <self.CreateSettingsDict()>
 	after all GUI elements were added.
 	"""
-	def __init__(self, parent=None, dev=None) :
+	def __init__(self, parent=None, dev=None, manager_cls=None) :
 		"""
 		`parent` is a wx.Notebook container containing all other controls
 		`dev`	is a device whose settings are contained in the current control
+		`manager_cls` is a class that can initialize `dev`
 		"""
 		wx.Panel.__init__(self, parent)
 		self.parent = parent
 		self.dev = dev
+		self.manager_cls = manager_cls
 		
 	def UpdateProperty (self, control, update_func_name, *args, **kwords) :
 		"""

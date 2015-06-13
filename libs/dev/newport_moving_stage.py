@@ -4,6 +4,7 @@ Newport moving stage (http://www.newport.com/MFA-Series-Miniature-Steel-Linear-S
 """
 
 from libs.gui.hardware_control import HardwareGUIControl
+from libs.gui.multi_state_button import MultiStateButton
 from libs.dev.basic_device import BasicDevice
 from libs.dev.basic_manager import BasicManager
 
@@ -230,12 +231,12 @@ class NewportMovingStageTab (HardwareGUIControl) :
 	This class represents a GUI controlling properties of Newport moving stage
 	"""
 	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev)
+		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerNewportMovingStage)
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		
 		# Specify the communication port name
-		sizer.Add (wx.StaticText(self, label="Communication port"), flag=wx.LEFT, border=5)
+		sizer.Add (wx.StaticText(self, label="\nCommunication port"), flag=wx.LEFT, border=5)
 		port_name = wx.TextCtrl (self, value="COM15")
 		port_name.__label__ = "port"
 		sizer.Add (port_name, flag=wx.EXPAND, border=5)
