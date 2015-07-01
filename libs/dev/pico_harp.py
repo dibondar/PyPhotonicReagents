@@ -329,8 +329,8 @@ class PicoHarpTab (HardwareGUIControl) :
 	"""
 	This class represents a GUI controlling properties of PicoHarp.
 	"""
-	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerPicoHarp)
+	def __init__(self, parent, **kwards) :
+		HardwareGUIControl.__init__(self, parent, manager_cls=ManagerPicoHarp, **kwards)
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		
@@ -418,9 +418,10 @@ class PicoHarpTab (HardwareGUIControl) :
 		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
 		
 		# Button for displaying histogram
-		show_histogram_button = MultiStateButton(self, 
-			actions=[self.StartShowingHistogram, self.StopShowingHistogram], 
-			labels=["Show histogram", "STOP histogram"] 
+		show_histogram_button = MultiStateButton(self, states=[
+			 (self.StartShowingHistogram, "Show histogram"), 
+			 (self.StopShowingHistogram, "STOP histogram")
+			]
 		)
 		sizer.Add (show_histogram_button, flag=wx.EXPAND, border=5)
 		
@@ -433,15 +434,10 @@ class PicoHarpTab (HardwareGUIControl) :
 		"""
 		Start continuous measurement of histogram
 		"""
-		if self.dev is None :
-			# PicoHarp manger not been initialized 
-			self.dev = ManagerPicoHarp()
-			self._PicoHarpProc = self.dev.start()
+		# Decide whether the device needs to be destroy at the end of usage
+		self._stop_dev = ( self.dev is None )
+		self.StartDev()
 		
-		# Initialize PicoHarp
-		if self.dev.SetSettings( self.GetSettings() ) == RETURN_FAIL : 
-			raise RuntimeError("PicoHarp settings could not be set")
-	
 		# Start acquisition of histogram
 		self.dev.StartHistogramMeas()
 	
@@ -456,17 +452,10 @@ class PicoHarpTab (HardwareGUIControl) :
 		self._abort_show_histogram = True
 		self.dev.StopHistogramMeas()
 		
-		# If self._PicoHarpProc exits then clean-up
-		try :
-			self._PicoHarpProc
-			self.dev.Exit()
-			self._PicoHarpProc.join() 
-			del self._PicoHarpProc
-			del self.dev
-			self.dev = None
-			del self._histogram_plot
-		except AttributeError : 
-			pass
+		if self._stop_dev :
+			self.StopDev()
+		
+		del self._histogram_plot
 			
 	def ShowHistogram (self) :
 		"""

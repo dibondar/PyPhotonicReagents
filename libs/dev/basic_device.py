@@ -36,6 +36,7 @@ class BasicDevice (multiprocessing.Process):
 		# Checking the pipe for requested commands	
 		# until "Exit" is sent
 		for command, arguments in iter(self.pipe.recv, ("Exit",None)) :
+		
 			# Find method matching the command 
 			try : method = getattr(self, command)
 			except AttributeError :

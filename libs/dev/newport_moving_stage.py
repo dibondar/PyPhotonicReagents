@@ -43,12 +43,16 @@ class NewportMovingStage (BasicDevice):
 	"""
 	def SetSettings (self, settings) :
 		# Close the port if it is already used
-		try : del self.serial_port
-		except AttributeError : pass 
+		try : 
+			del self.serial_port
+		except AttributeError : 
+			pass 
 	
+		print "cool"
 		# Start the communication port
 		self.serial_port = serial.Serial (port=settings["port"], 
-			baudrate=19200,  bytesize=8, parity=serial.PARITY_NONE, stopbits=1, timeout=1.)
+			baudrate=19200,  bytesize=8, parity=serial.PARITY_NONE, stopbits=1, timeout=1.
+		)
 		
 		return RETURN_SUCCESS
 		
@@ -230,8 +234,8 @@ class NewportMovingStageTab (HardwareGUIControl) :
 	"""
 	This class represents a GUI controlling properties of Newport moving stage
 	"""
-	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerNewportMovingStage)
+	def __init__(self, parent, **kwards) :
+		HardwareGUIControl.__init__(self, parent, manager_cls=ManagerNewportMovingStage, **kwards)
 		
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		
@@ -245,9 +249,9 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
 		
 		# Button to start joystick
-		bind_joystick_button = MultiStateButton(self, 
-			actions=[self.StartJoystick, self.StopJoystick], 
-			labels=["Start joystick", "STOP joystick"] 
+		bind_joystick_button = MultiStateButton(self, states=[ 
+				(self.StartJoystick, "Start joystick"), (self.StopJoystick, "STOP joystick")
+			]
 		)
 		sizer.Add (bind_joystick_button, flag=wx.EXPAND, border=5)
 		
@@ -260,10 +264,10 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		"""
 		Bind joystick to moving stage
 		"""
-		if self.dev is None :
-			# Moving stage manager has not been initialized
-			self.dev = NewportMovingStage()
-			self._NewportMovingStageProc = self.dev.start()
+		# Decide whether the device needs to be destroy at the end of usage
+		self._stop_dev = ( self.dev is None )
+		
+		self.StartDev()
 		
 		# Start joystick binding
 		self.joystick_event = multiprocessing.Event()
@@ -277,13 +281,6 @@ class NewportMovingStageTab (HardwareGUIControl) :
 		# Send the signal to stop synchronizing joystick
 		self.joystick_event.clear()
 	
-		# If self._NewportMovingStageProc exits then clean-up
-		try :
-			self._NewportMovingStageProc
-			self.dev.Exit()
-			self._NewportMovingStageProc.join() 
-			del self._NewportMovingStageProc
-			del self.dev
-			self.dev = None
-		except AttributeError : 
-			pass
+		if self._stop_dev :
+			self.StopDev()
+		

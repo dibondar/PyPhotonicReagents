@@ -187,8 +187,8 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 	"""
 	This class represents a GUI controlling properties of Thorlabs camera
 	"""
-	def __init__(self, parent, dev=None) :
-		HardwareGUIControl.__init__(self, parent, dev, manager_cls=ManagerThorlabsCamera)
+	def __init__(self, parent, **kwards) :
+		HardwareGUIControl.__init__(self, parent, manager_cls=ManagerThorlabsCamera, **kwards)
 	 
 		sizer = wx.BoxSizer(wx.VERTICAL)
 		
@@ -215,9 +215,9 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 		sizer.Add (wx.StaticText(self, label=""), flag=wx.LEFT, border=5)
 		
 		# Button for displaying image 
-		show_img_button = MultiStateButton(self, 
-			actions=[self.StartShowingImg, self.StopShowingImg], 
-			labels=["Show image", "STOP"] 
+		show_img_button = MultiStateButton(self, states=[
+				(self.StartShowingImg, "Show image"), (self.StopShowingImg, "STOP")
+			]
 		)
 		sizer.Add (show_img_button, flag=wx.EXPAND, border=5)
 		
@@ -230,10 +230,9 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 		"""
 		Start continuous acquisition of image
 		"""
-		if self.dev is None :
-			# Thorlabs camera manger not been initialized 
-			self.dev = ManagerThorlabsCamera()
-			self._ThorlabsCameraProc = self.dev.start()
+		# Decide whether the device needs to be destroy at the end of usage
+		self._stop_dev = ( self.dev is None )
+		self.StartDev()
 		
 		# Start acquisition of image
 		self.dev.StartImgAqusition()
@@ -249,17 +248,10 @@ class ThorlabsCameraTab (HardwareGUIControl) :
 		self._abort_img = True
 		self.dev.StopImgAqusition()
 		
-		# If self._ThorlabsCameraProc exits then clean-up
-		try :
-			self._ThorlabsCameraProc
-			self.dev.Exit()
-			self._ThorlabsCameraProc.join() 
-			del self._ThorlabsCameraProc
-			del self.dev
-			self.dev = None
-			del self._img_plot
-		except AttributeError : 
-			pass
+		if self._stop_dev :
+			self.StopDev()
+		
+		del self._img_plot
 		
 	def ShowImg (self) :
 		"""

@@ -5,38 +5,34 @@ class MultiStateButton (wx.Button) :
 	"""
 	Button that has multiple states
 	"""
-	def __init__ (self,  parent, actions=[], labels=[], colours=[], **kwargs) :
+	def __init__ (self,  parent, states=[], **kwargs) :
 		"""
 		Constructor:
-		
-			actions -- list of methods corresponding to pressing the button (to peform at different state)
-			labels	-- list of names of different states
-			colours -- lost of colours to shade the button at different stages
+			state_specs -- list of tuples specifying state, e.g, [(callable function, label, colour)]
 		"""
 		wx.Button.__init__ (self, parent, **kwargs)
 		
-		if len(actions) == 0 :
-			print Warning("No actions are defined. MultiStateButton will behave as an ordinary button")
+		if len(states) == 0 :
+			print ("Warning: No actions are defined. MultiStateButton will behave as an ordinary button")
 			return
 		
 		# generate default colour scheme
-		if len(colours) == 0 :
-			colours = ['']
-			
-		if len(colours) < len(actions) :
-			colours.extend( 
-				itertools.islice( itertools.cycle(['red', 'blue', 'green']), len(actions)-len(colours) )
-			)
-		else :
-			colours = colours[:len(actions)]
+		colours = itertools.chain( [''], itertools.cycle(['', 'red', 'blue', 'green']) )
 		
-		if len(labels) < len(actions) :
-			labels.extend( itertools.repeat('', len(actions)-len(labels)) )
-		else :
-			labels = labels[:len(actions)]
+		actions = []
+		
+		for specs in states :
+			assert len(specs) 
+			
+			if len(specs) == 1 :
+				actions.append( (specs[0], '', colours.next()) )
+			elif len(specs) == 2 :
+				actions.append( (specs[0], specs[1], colours.next()) )
+			else :
+				actions.append( tuple(specs[:3]) )
 			
 		# Create iterator
-		self._actions = itertools.cycle( itertools.izip(actions, labels, colours) )
+		self._actions = itertools.cycle(actions)
 		
 		self.SetNextStep()
 		

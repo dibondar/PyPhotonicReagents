@@ -5,6 +5,7 @@
 #
 ########################################################################
 
+from libs.dev.consts import * 
 from h5py._hl.dataset import Dataset as HD5Dataset
 import wx
 from wx.lib.agw.floatspin import FloatSpin as wxFloatSpin
@@ -18,32 +19,56 @@ class HardwareGUIControl (wx.Panel) :
 	Note that the children of this class must call method <self.CreateSettingsDict()>
 	after all GUI elements were added.
 	"""
-	def __init__(self, parent=None, dev=None, manager_cls=None) :
+	def __init__(self, parent=None, dev=None, manager_cls=None, **kwargs) :
 		"""
 		`parent` is a wx.Notebook container containing all other controls
 		`dev`	is a device whose settings are contained in the current control
 		`manager_cls` is a class that can initialize `dev`
 		"""
-		wx.Panel.__init__(self, parent)
+		wx.Panel.__init__(self, parent, **kwargs)
 		self.parent = parent
 		self.dev = dev
 		self.manager_cls = manager_cls
+	
+	def StartDev (self) :
+		"""
+		This function implements the singleton patern of the device initialization 
+		"""
+		if self.dev is None :
+			# Device has not been initialized yet
+			if self.manager_cls :
+				# Use the specified device manager to initialize the class
+				self.dev = self.manager_cls()
+				self.dev.start()
 		
+		self.UpdateSettings()
+		
+		return self.dev
+		
+	def StopDev (self) :
+		"""
+		Stop the device
+		"""
+		if self.dev is not None :
+			self.dev.Exit()
+			self.dev = None
+	
 	def UpdateProperty (self, control, update_func_name, *args, **kwords) :
 		"""
 		This method is used to intransitively update (via `control`) a particular settings  
 		of the device by calling the function `update_func_name` in the device manager
 		"""
-		if self.dev :
+		if self.dev is not None :
 			getattr(self.dev, update_func_name)( control.GetValue() )
 	
 	def UpdateSettings (self, *args, **kwords) :
 		"""
 		This method is used to interactively update all hardware settings, if the device is initialized 
 		"""
-		if self.dev :
-			self.dev.SetSettings( self.GetSettings() )
-	
+		if self.dev is not None :
+			if self.dev.SetSettings( self.GetSettings() ) == RETURN_FAIL : 
+				raise RuntimeError("Settings could not be set")
+				
 	def CreateSettingsDict (self) :
 		"""
 		Generate a dictionary with settings that bind to control elements

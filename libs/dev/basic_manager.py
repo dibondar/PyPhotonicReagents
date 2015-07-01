@@ -16,7 +16,7 @@ class BasicManager :
 		self.lock = multiprocessing.Lock()
 		# Create a pipe for communication
 		self.parent_connection, self.child_connection = multiprocessing.Pipe()
-	
+		
 	def __del__ (self) :
 		self.parent_connection.close()
 		self.child_connection.close()

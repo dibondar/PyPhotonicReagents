@@ -11,17 +11,12 @@ class SettingsNotebook (wx.Notebook) :
 	"""
 	GUI container (wx.Notebook) for 
 	"""
-	def __init__ (self, parent, tabs=[], tab_labes=[], dev_names=[], auto_load=True, **kwargs) :
+	def __init__ (self, parent, specs=[], auto_load=True, **kwargs) :
 		"""
-		tabs 		-- list of derivative classes of HardwareGUIControl
-		tab_labes 	-- list of tab labels to be displayed
-		dev_names	-- list of names of devices represented by tabs 
-				(if tab does not represent device then dev_names = None)
+		specs -- list of tuple specifying tab settings, e..g,
+					[ (tab_class, label(string), dev_name(string)) ] 
+				if dev_name = None then the specified tuple does not represent device 
 		"""
-		# check for consistency
-		assert len(tabs) == len(tab_labes)
-		assert len(tabs) == len(dev_names)
-		
 		wx.Notebook.__init__(self, parent, **kwargs)
 		
 		# dictionary of all tabs
@@ -30,7 +25,19 @@ class SettingsNotebook (wx.Notebook) :
 		# dictionary of tabs representing devices
 		self._devs = {}
 		
-		for tab, label, dev_name in zip(tabs, tab_labes, dev_names) :
+		for tab_specs in specs :
+		
+			# Unpacking specifications
+			if len(tab_specs) <= 1 :
+				raise ValueError("Minimal specification of a tab is (tab_class, tab_label,)")
+				
+			tab 	= tab_specs[0]
+			label	= tab_specs[1]
+			try :
+				dev_name = tab_specs[2]
+			except IndexError :
+				dev_name = label
+
 			# Initialize the GUI Tab
 			tab = tab(self)
 			
@@ -59,29 +66,14 @@ class SettingsNotebook (wx.Notebook) :
 		"""
 		Start device specified by name
 		"""
-		# Extract the underlying tab
-		tab = self._devs[dev_name]
-		dev = tab.dev
-		
-		# Perform initialization, if not yet initialized
-		if dev is None :
-			# Create manager
-			dev = tab.manager_cls()
-			# Start underlying process
-			dev.start()
-		
-		# Set current settings
-		dev.SetSettings( tab.GetSettings() )
-		
-		return dev
+		return self._devs[dev_name].StartDev()
 		
 	def StopAllDevices (self, event=None, auto_save=True) :
 		"""
 		Close all devices that have been initialized
 		"""
 		for tab in self._devs.values() :
-			if tab.dev :
-				tab.dev.Exit()
+			tab.StopDev()
 		
 		# Auto save settings
 		if auto_save :
@@ -91,8 +83,9 @@ class SettingsNotebook (wx.Notebook) :
 		if event :
 			# Destroy parent window 
 			event.GetEventObject().Destroy() 
-	
-	def GetAutoSavingFilename (self) :
+		
+	@classmethod
+	def GetAutoSavingFilename (cls) :
 		"""
 		Return file name where settings are saved automatically
 		"""
@@ -171,3 +164,11 @@ class SettingsNotebook (wx.Notebook) :
 			
 		# return valid file name
 		return filename
+		
+	def GetAllSettings(self) :
+		"""
+		Return a dictionary of all dictionary containing settings from all tabs 
+		"""
+		return dict(
+			(label, tab.GetSettings()) for label, tab in self._tabs.items()
+		)
