@@ -560,7 +560,8 @@ class CalibrateShaper (BasicWindow) :
 			
 			# function that converts pixel number to pulse shaper
 			# `pixel_to_lamba` is a dictionary  with key = pixel, value = lambda
-			deg = min(2,len(pixel_to_lamba)-1)
+			deg = 1 #min(1,len(pixel_to_lamba)-1)
+			print np.polyfit(pixel_to_lamba.keys(), pixel_to_lamba.values(), 1 )
 			pixel2lambda_func = np.poly1d( np.polyfit(pixel_to_lamba.keys(), pixel_to_lamba.values(), deg=deg ) )
 			#lambda2pixel_func = np.poly1d( np.polyfit(pixel_to_lamba.values(), pixel_to_lamba.keys(), deg=deg ) )
 			
@@ -804,7 +805,11 @@ class CalibrateShaper (BasicWindow) :
 			width = self.SettingsNotebook.CalibrateShaper.pixel_bundle_width.GetValue() / 2
 			start_pixel_bundle = self.pixel_to_vary.GetValue()
 			mask = np.copy(self.fixed_mask)
-			mask[ max(start_pixel_bundle-width, 0):min(mask.size, start_pixel_bundle+width) ] = voltage
+			if width:
+				mask[max(start_pixel_bundle-width, 0):min(mask.size, start_pixel_bundle+width)] = voltage
+			else:
+				# Enforce single pixel width
+				mask[min(max(start_pixel_bundle,0),mask.size)] = voltage	
 			self.PulseShaper.SetMasks( mask, self.fixed_mask)
 		
 			# Getting spectrum
