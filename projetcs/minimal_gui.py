@@ -50,7 +50,7 @@ class SettingsNotebook (wx.Notebook) :
 			
 ########################################################################
 
-class CalibrateShaper (BasicWindow) :
+class PerformAction(BasicWindow) :
 
 	def __init__ (self, parent) :
 		# Starting spectrometer
@@ -210,5 +210,5 @@ class CalibrateShaper (BasicWindow) :
 if __name__ == '__main__' :
 	app = visvis.use('wx')
 	app.Create()
-	CalibrateShaper (None)
+	PerformAction(None)
 	app.Run()
