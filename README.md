@@ -1,9 +1,9 @@
 # PyPhotonicReagents
 
-A standalone Pythonic suite for advanced laser experiments involving a broad class of equipment, such as laser pulse shapers, spectrometers, cameras, and moving stages.
+A standalone Pythonic suite (**written in Python 2**)for advanced laser experiments involving a broad class of equipment, such as laser pulse shapers, spectrometers, cameras, and moving stages.
 
 ## Overview
-Note: This is implemented in Python 2.
+
 PyPhotonicReagents provides a unified Python interface for controlling laboratory instruments commonly used in ultrafast laser experiments and photonics research. Developed by [Prof. Denys Bondar](https://sse.tulane.edu/denys-bondar-phd) at Tulane University, this library supports experimental work in quantum control and ultrafast nonlinear optics.
 
 ## Supported Equipment
@@ -12,6 +12,39 @@ PyPhotonicReagents provides a unified Python interface for controlling laborator
 - **Spectrometers** - Optical spectrum analyzers for spectral characterization
 - **Cameras** - Scientific imaging devices for beam profiling and data acquisition
 - **Moving Stages** - Motorized translation/rotation stages for optical alignment and scanning
+
+## Repository Structure
+
+```
+PyPhotonicReagents/
+├── __init__.py              # Package initialization and exports
+├── pulse_shaper.py          # SLM-based pulse shaper control module
+├── spectrometer.py          # Spectrometer interface and data acquisition
+├── camera.py                # Scientific camera control and image capture
+├── stage.py                 # Motorized stage positioning control
+├── utils.py                 # Common utilities, data processing, calibration
+├── config.py                # Hardware configuration and device parameters
+├── experiments/             # Example experiment scripts
+│   ├── miips_compression.py # MIIPS pulse compression implementation
+│   ├── spectral_scan.py     # Automated spectral scanning routines
+│   └── delay_scan.py        # Time-delay scanning experiments
+├── calibration/             # Calibration routines and data
+│   ├── slm_calibration.py   # SLM phase-to-voltage calibration
+│   └── spectrometer_cal.py  # Wavelength calibration routines
+├── tests/                   # Unit tests for hardware interfaces
+└── docs/                    # Additional documentation
+```
+
+### File Descriptions
+
+| File | Description |
+|------|-------------|
+| `pulse_shaper.py` | Controls SLM-based pulse shapers for femtosecond pulse compression and shaping. Handles phase mask generation, display rendering, and dispersion compensation. |
+| `spectrometer.py` | Interface for optical spectrometers. Manages spectrum acquisition, wavelength calibration, integration time control, and spectral data processing. |
+| `camera.py` | Scientific camera control for beam profiling and imaging. Supports exposure control, ROI selection, and frame acquisition. |
+| `stage.py` | Motorized translation/rotation stage control. Provides absolute/relative positioning, velocity control, and limit handling. |
+| `utils.py` | Shared utilities including FFT operations, polynomial fitting, data I/O, and signal processing functions. |
+| `config.py` | Hardware configuration management. Stores device addresses, COM ports, calibration parameters, and default settings. |
 
 ## Installation
 
@@ -43,8 +76,6 @@ PyPhotonicReagents implements peripheral communication through a modular wrapper
    - **Ethernet/TCP-IP**: Network-connected devices for remote control
    - **Camera Interfaces**: Vendor SDKs (e.g., DCAM, uEye) or standards like GenICam
 
-
-
 ### Synchronization and Triggering
 
 Laboratory experiments often require precise timing between components:
@@ -52,7 +83,6 @@ Laboratory experiments often require precise timing between components:
 - **Software Triggering**: Python controls acquisition sequences directly
 - **Hardware Triggering**: TTL signals coordinate laser shots with data acquisition
 - **Event-Driven Callbacks**: Some SDKs support asynchronous notification of acquisition completion
-
 
 ## Related Research
 
@@ -65,8 +95,7 @@ This library supports research in:
 ## Author
 
 **Denys I. Bondar, Ph.D.**  
+
 - [ORCID](https://orcid.org/0000-0002-3626-4804)
-
-
 
 > **Note**: This README was generated based on the repository description and author's research context. For implementation details, refer to the source code in the repository.
